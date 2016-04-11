@@ -121,6 +121,9 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Bit.cpp" />
+    <ClCompile Include="Condition.cpp" />
+    <ClCompile Include="Database.cpp" />
+    <ClCompile Include="DatabaseFile.cpp" />
     <ClCompile Include="DiskFile.cpp" />
     <ClCompile Include="FileUtil.cpp" />
     <ClCompile Include="PageFreeMapFile.cpp" />
@@ -128,22 +131,31 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="DataPage.cpp" />
     <ClCompile Include="Record.cpp" />
+    <ClCompile Include="RecordBuffer.cpp" />
     <ClCompile Include="RecordFile.cpp" />
     <ClCompile Include="RecordTable.cpp" />
+    <ClCompile Include="system.cpp" />
     <ClCompile Include="TableFile.cpp" />
+    <ClCompile Include="View.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Bit.h" />
+    <ClInclude Include="Condition.h" />
+    <ClInclude Include="Database.h" />
+    <ClInclude Include="DatabaseFile.h" />
     <ClInclude Include="DiskFile.h" />
     <ClInclude Include="FileUtil.h" />
     <ClInclude Include="DataPage.h" />
     <ClInclude Include="BitmapPageFreeMapFile.h" />
     <ClInclude Include="HashIndexFile.h" />
     <ClInclude Include="Record.h" />
+    <ClInclude Include="RecordBuffer.h" />
     <ClInclude Include="RecordFile.h" />
     <ClInclude Include="RecordTable.h" />
     <ClInclude Include="resource.h" />
+    <ClInclude Include="system.h" />
     <ClInclude Include="TableFile.h" />
+    <ClInclude Include="View.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

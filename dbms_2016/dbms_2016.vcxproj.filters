@@ -48,6 +48,24 @@
     <ClCompile Include="TableFile.cpp">
       <Filter>原始程式檔</Filter>
     </ClCompile>
+    <ClCompile Include="View.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="Condition.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="Database.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="DatabaseFile.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="system.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="RecordBuffer.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="FileUtil.h">
@@ -81,6 +99,24 @@
       <Filter>標頭檔</Filter>
     </ClInclude>
     <ClInclude Include="TableFile.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="View.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="Condition.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="Database.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="DatabaseFile.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="system.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="RecordBuffer.h">
       <Filter>標頭檔</Filter>
     </ClInclude>
   </ItemGroup>

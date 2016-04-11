@@ -99,8 +99,8 @@ public:
 	inline unsigned int put_record(unsigned int ,void *, unsigned char *);
 	inline bool get_record(unsigned int, void *);
 	inline const DataPage<PAGESIZE> *get_data_page(unsigned int);
-	inline unsigned int find_record(void *, unsigned int, bool *);
-	inline unsigned int find_record_with_int(int, unsigned int, unsigned int, bool *);
+	inline unsigned int find_record(const void *, unsigned int, bool *);
+	inline unsigned int find_record_with_col(const void *, unsigned int, unsigned int, unsigned int, bool *);
 
 	inline void init(size_t rowsize);
 	inline void write_back();
@@ -197,8 +197,14 @@ get_record(unsigned int file_addr, void *dst)
 }
 
 template<size_t PAGESIZE, unsigned int BUFFER_NUM_ROW, unsigned int BUFFER_NUM_COL, unsigned int BUFFER_SLOT_NUM>
+inline const DataPage<PAGESIZE>* RecordFile<PAGESIZE, BUFFER_NUM_ROW, BUFFER_NUM_COL, BUFFER_SLOT_NUM>::get_data_page(unsigned int page_id)
+{
+	return get_page(page_id, PAGEBUFFER_READ);
+}
+
+template<size_t PAGESIZE, unsigned int BUFFER_NUM_ROW, unsigned int BUFFER_NUM_COL, unsigned int BUFFER_SLOT_NUM>
 inline unsigned int RecordFile<PAGESIZE, BUFFER_NUM_ROW, BUFFER_NUM_COL, BUFFER_SLOT_NUM>::
-find_record(void *src, unsigned int max_page, bool *result)
+find_record(const void *src, unsigned int max_page, bool *result)
 {
 	// WARNING: exhaustive searching here
 	// AVOID DIRECT CALLING find_record, use index to find record instead
@@ -218,13 +224,13 @@ find_record(void *src, unsigned int max_page, bool *result)
 
 template<size_t PAGESIZE, unsigned int BUFFER_NUM_ROW, unsigned int BUFFER_NUM_COL, unsigned int BUFFER_SLOT_NUM>
 inline unsigned int RecordFile<PAGESIZE, BUFFER_NUM_ROW, BUFFER_NUM_COL, BUFFER_SLOT_NUM>::
-find_record_with_int(int val, unsigned int col_offset, unsigned int max_page, bool *result)
+find_record_with_col(const void *src, unsigned int max_page, unsigned int col_offset, unsigned int col_size, bool *result)
 {
 	for (int i = 0; i <= max_page; i++)
 	{
 		int row_id;
 		DataPage<PAGESIZE_8K> *page = get_page(i, PAGEBUFFER_READ);
-		if ((row_id = page->find_col_int(val, col_offset)) >= 0)
+		if ((row_id = page->find_col(src, col_offset, col_size)) >= 0)
 		{
 			*result = true;
 			return get_page_addr(i, row_id);

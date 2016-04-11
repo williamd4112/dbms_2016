@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <cstdio>
 #include <queue>
+#include <cassert>
 
 #define PAGESIZE_8K 8192
 #define ROW_USED 0xff
@@ -41,16 +42,19 @@ public:
 	inline bool read_int_at(int row_id, size_t row_offset, void *dst);
 	inline bool read_varchar_at(int row_id, size_t row_offset, void *dst, size_t len);
 
+	const unsigned char *get_data_row(unsigned int row_id) const;
+
 	inline void write_back(FILE *file, size_t offset);
 	inline void read_at(FILE *file, size_t offset);
 	
-	inline int find_row(void *src);
+	inline int find_row(const void *src);
+	inline int find_col(const void *src, unsigned int col_offset, unsigned int col_size);
 	inline int find_col_int(int src, unsigned int col_offset);
 	inline int find_col_varchar(char * src, unsigned int col_offset, unsigned int col_size);
 
 	inline bool isUsed(int row_id);
 	inline bool isFull();
-	inline unsigned int get_row_count();
+	inline unsigned int get_row_count() const;
 
 	void dump_info();
 private:
@@ -184,6 +188,13 @@ inline bool DataPage<PAGESIZE>::read_varchar_at(int row_id, size_t row_offset, v
 }
 
 template<size_t PAGESIZE>
+inline const unsigned char * DataPage<PAGESIZE>::get_data_row(unsigned int row_id) const
+{
+	assert(row_id >= 0 && row_id < *mpRowCount);
+	return get_row_addr(row_id);
+}
+
+template<size_t PAGESIZE>
 inline void DataPage<PAGESIZE>::write_back(FILE * file, size_t offset)
 {
 	FileUtil::write_back(file, offset, mData, PAGESIZE);
@@ -217,9 +228,9 @@ inline void DataPage<PAGESIZE>::read_at(FILE * file, size_t offset)
 		   - -1 - fail (PageOffset must < 32 bit, don't worry about ambiguious)
 */
 template<size_t PAGESIZE>
-inline int DataPage<PAGESIZE>::find_row(void * src)
+inline int DataPage<PAGESIZE>::find_row(const void * src)
 {
-	for (int i = 0; i < mMaxRowCount; i++)
+	for (int i = 0; i < *mpRowCount; i++)
 	{
 		if (isUsed(i))
 		{
@@ -231,13 +242,13 @@ inline int DataPage<PAGESIZE>::find_row(void * src)
 }
 
 template<size_t PAGESIZE>
-inline int DataPage<PAGESIZE>::find_col_int(int src, unsigned int col_offset)
+inline int DataPage<PAGESIZE>::find_col(const void * col_src, unsigned int col_offset, unsigned int col_size)
 {
-	for (int i = 0; i < mMaxRowCount; i++)
+	for (int i = 0; i < *mpRowCount; i++)
 	{
 		if (isUsed(i))
 		{
-			if (memcmp(&src, get_col_addr(i, col_offset), sizeof(int)) == 0)
+			if (memcmp(col_src, get_col_addr(i, col_offset), col_size) == 0)
 				return i;
 		}
 	}
@@ -245,17 +256,15 @@ inline int DataPage<PAGESIZE>::find_col_int(int src, unsigned int col_offset)
 }
 
 template<size_t PAGESIZE>
+inline int DataPage<PAGESIZE>::find_col_int(int src, unsigned int col_offset)
+{
+	return find_col(&src, col_offset, sizeof(int));
+}
+
+template<size_t PAGESIZE>
 inline int DataPage<PAGESIZE>::find_col_varchar(char * src, unsigned int col_offset, unsigned int col_size)
 {
-	for (int i = 0; i < mMaxRowCount; i++)
-	{
-		if (isUsed(i))
-		{
-			if (memcmp(&src, get_col_addr(i, col_offset), col_size) == 0)
-				return i;
-		}
-	}
-	return -1;
+	return find_col(src, col_offset, col_size);
 }
 
 template<size_t PAGESIZE>
@@ -273,7 +282,7 @@ inline bool DataPage<PAGESIZE>::isFull()
 }
 
 template<size_t PAGESIZE>
-inline unsigned int DataPage<PAGESIZE>::get_row_count()
+inline unsigned int DataPage<PAGESIZE>::get_row_count() const
 {
 	return *mpRowCount;
 }

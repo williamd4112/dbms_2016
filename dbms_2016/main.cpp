@@ -5,32 +5,52 @@
 #include "RecordFile.h"
 #include "TableFile.h"
 #include "RecordTable.h"
+#include "DatabaseFile.h"
 #include "Bit.h"
 
+#pragma pack(push)
+#pragma pack(1)
 struct structure_record {
 	int id;
 	char name[40];
 	char addr[5];
 	int gender;
 };
+#pragma pack(pop)
 
 void test_datapage();
 void test_freemapfile();
 void test_bitutil_get_val_uint32();
+
 void test_recordfile_write();
 void test_recordfile_write_struct_record();
 void test_recordfile_read();
 void test_recordfile_read_struct_record();
 void test_recordfile_find();
 void test_recordfile_find_col();
+
 void test_tablefile_init();
 void test_tablefile_readfrom();
+
 void test_recordtable_create();
+void test_recordtable_create_duplicate();
 void test_recordtable_select();
+void test_recordtable_primarykey();
+
+//void test_recordtable_table_alias();
+//void test_recordtable_column_alias();
+//void test_recordtable_select_where();
+//void test_recordtable_count();
+//void test_recordtable_sum();
+//void test_recordtable_innerjoin();
+
+void test_dbms_table_create();
+void test_dbms_table_read();
+void test_dbms_table_create_duplicate();
 
 int main(int argc, char *argv[])
 {
-	test_recordtable_create();
+	test_dbms_table_create_duplicate();
 	system("pause");
 
 	return 0;
@@ -179,7 +199,7 @@ void test_recordfile_find_col()
 	{
 		int id = rand() % 10;
 		bool result;
-		unsigned int addr = rf.find_record_with_int(id, offsetof(structure_record, id), 1, &result);
+		unsigned int addr = rf.find_record_with_col(&id, 1, offsetof(structure_record, id), sizeof(unsigned int), &result);
 		if (result)
 		{
 			printf("Record %d found at Page %d, Row %d\n",id, get_page_id(addr), get_page_offset(addr));
@@ -199,14 +219,14 @@ void test_recordfile_find_col()
 void test_tablefile_init()
 {
 	table_attr_desc_t descs[3] = {
-		{ "ID", 0, 4 },
-		{ "Name", 4, 40 },
-		{ "Phone", 44, 10 }
+		{ "ID", ATTR_TYPE_INTEGER, 0, 4 },
+		{ "Name", ATTR_TYPE_VARCHAR, 4, 40 },
+		{ "Phone", ATTR_TYPE_VARCHAR, 44, 10 },
 	};
 
 	TableFile tb;
 	tb.open("test.tbl", "wb+");
-	tb.init("Student", 3, descs);
+	tb.init("Student", 3, descs, -1);
 	tb.write_back();
 }
 
@@ -222,40 +242,149 @@ void test_recordtable_create()
 {
 	structure_record record{1, "Williamd", "NTHU", 2 };
 	table_attr_desc_t descs[4] = {
-		{ "ID", 0, 4 },
-		{ "Name", 4, 40 },
-		{ "Phone", 44, 10 },
-		{ "Gender", 54, 4}
+		{ "ID", ATTR_TYPE_INTEGER, offsetof(structure_record, id), 4 },
+		{ "Name", ATTR_TYPE_VARCHAR, offsetof(structure_record, name), 40 },
+		{ "Addr", ATTR_TYPE_VARCHAR, offsetof(structure_record, addr), 5 },
+		{ "Gender", ATTR_TYPE_INTEGER, offsetof(structure_record, gender), 4 }
 	};
 
 	RecordTable<PAGESIZE_8K> rt;
-	rt.create("table", 4, descs);
+	rt.create("table", 4, descs, -1);
 	
 	for (int i = 0; i < 10; i++)
 	{
 		rt.insert(&record);
 		record.id++;
 	}
+	rt.save_table();
+	rt.save_freemap();
+	rt.save_record();
+}
+
+void test_recordtable_create_duplicate()
+{
+	structure_record record{ 1, "Williamd", "NTHU", 2 };
+	table_attr_desc_t descs[4] = {
+		{ "ID", ATTR_TYPE_INTEGER, offsetof(structure_record, id), 4 },
+		{ "Name", ATTR_TYPE_VARCHAR, offsetof(structure_record, name), 40 },
+		{ "Addr", ATTR_TYPE_VARCHAR, offsetof(structure_record, addr), 5 },
+		{ "Gender", ATTR_TYPE_INTEGER, offsetof(structure_record, gender), 4 }
+	};
+
+	RecordTable<PAGESIZE_8K> rt;
+	rt.create("table", 4, descs, -1);
+
+	for (int i = 0; i < 10; i++)
+	{
+		rt.insert(&record);
+	}
+	rt.save_table();
+	rt.save_freemap();
+	rt.save_record();
 }
 
 void test_recordtable_select()
 {
 	structure_record record{ 1, "Williamd", "NTHU", 2 };
 	table_attr_desc_t descs[4] = {
-		{ "ID", 0, 4 },
-		{ "Name", 4, 40 },
-		{ "Phone", 44, 10 },
-		{ "Gender", 54, 4 }
+		{ "ID", ATTR_TYPE_INTEGER, offsetof(structure_record, id), 4 },
+		{ "Name", ATTR_TYPE_VARCHAR, offsetof(structure_record, name), 40 },
+		{ "Addr", ATTR_TYPE_VARCHAR, offsetof(structure_record, addr), 5 },
+		{ "Gender", ATTR_TYPE_INTEGER, offsetof(structure_record, gender), 4 }
+	};
+
+	const char *cols[] = {"ID", "Addr", "Gender"};
+
+	RecordTable<PAGESIZE_8K> rt;
+	rt.load("table");
+
+	rt.select_show(cols, 3);
+}
+
+void test_recordtable_primarykey()
+{
+	structure_record record{ 1, "Williamd", "NTHU", 2 };
+	table_attr_desc_t descs[4] = {
+		{ "ID", ATTR_TYPE_INTEGER, offsetof(structure_record, id), 4 },
+		{ "Name", ATTR_TYPE_VARCHAR, offsetof(structure_record, name), 40 },
+		{ "Addr", ATTR_TYPE_VARCHAR, offsetof(structure_record, addr), 5 },
+		{ "Gender", ATTR_TYPE_INTEGER, offsetof(structure_record, gender), 4 }
 	};
 
 	RecordTable<PAGESIZE_8K> rt;
-	rt.create("table", 4, descs);
+	rt.create("table", 4, descs, 0);
 
 	for (int i = 0; i < 10; i++)
 	{
 		rt.insert(&record);
 		record.id++;
 	}
+	rt.save_table();
+	rt.save_freemap();
+	rt.save_record();
 }
 
+void test_dbms_table_create()
+{
+	table_attr_desc_t descs[4] = {
+		{ "ID", ATTR_TYPE_INTEGER, offsetof(structure_record, id), 4 },
+		{ "Name", ATTR_TYPE_VARCHAR, offsetof(structure_record, name), 40 },
+		{ "Addr", ATTR_TYPE_VARCHAR, offsetof(structure_record, addr), 5 },
+		{ "Gender", ATTR_TYPE_INTEGER, offsetof(structure_record, gender), 4 }
+	};
+	structure_record record{ 1, "Williamd", "NTHU", 2 };
+	const char *cols[] = { "ID", "Addr", "Gender" };
 
+	DatabaseFile<PAGESIZE_8K> dbf;
+	dbf.open("test.dbs", "w");
+	dbf.create_table("test_table1", descs, 4, -1);
+
+	RecordTable<PAGESIZE_8K> *rt = dbf.get_table("test_table1");
+	for (int i = 0; i < 10; i++)
+	{
+		rt->insert(&record);
+		record.id++;
+	}
+	rt->select_show(cols, 3);
+
+	dbf.write_back();
+}
+
+void test_dbms_table_read()
+{
+	DatabaseFile<PAGESIZE_8K> dbf;
+	dbf.open("test.dbs", "r+");
+	dbf.read_from();
+
+	RecordTable<PAGESIZE_8K> *rt = dbf.get_table("test_table1");
+	const char *cols[] = { "ID", "Addr", "Gender", "Name" };
+
+	rt->select_show(cols, 4);
+}
+
+void test_dbms_table_create_duplicate()
+{
+	table_attr_desc_t descs[4] = {
+		{ "ID", ATTR_TYPE_INTEGER, offsetof(structure_record, id), 4 },
+		{ "Name", ATTR_TYPE_VARCHAR, offsetof(structure_record, name), 40 },
+		{ "Addr", ATTR_TYPE_VARCHAR, offsetof(structure_record, addr), 5 },
+		{ "Gender", ATTR_TYPE_INTEGER, offsetof(structure_record, gender), 4 }
+	};
+	structure_record record{ 1, "Williamd", "NTHU", 2 };
+	const char *cols[] = { "ID", "Addr", "Gender" };
+
+	DatabaseFile<PAGESIZE_8K> dbf;
+	dbf.open("test.dbs", "w");
+	dbf.create_table("test_table1", descs, 4, -1);
+	dbf.create_table("test_table1", descs, 4, -1);
+
+	RecordTable<PAGESIZE_8K> *rt = dbf.get_table("test_table1");
+	for (int i = 0; i < 10; i++)
+	{
+		rt->insert(&record);
+		record.id++;
+	}
+	rt->select_show(cols, 3);
+
+	dbf.write_back();
+}
