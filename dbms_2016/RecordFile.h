@@ -71,6 +71,7 @@ public:
 	{
 #define file_offset(pid) (pid) * PAGESIZE
 #define flush_slot(bid) mPages[(bid)].write_back(*mpFile, mBufferPageID[(bid)] * PAGESIZE); \
+		mPages[(bid)].clear(); \
 		mBufferSlotInfo[(bid)] = 0x0; \
 		mBufferPageID[(bid)] = 0
 
@@ -98,7 +99,7 @@ public:
 	
 	inline unsigned int put_record(unsigned int ,void *, unsigned char *);
 	inline bool get_record(unsigned int, void *);
-	inline const DataPage<PAGESIZE> *get_data_page(unsigned int);
+	inline DataPage<PAGESIZE> *get_data_page(unsigned int);
 	inline unsigned int find_record(const void *, unsigned int, bool *);
 	inline unsigned int find_record_with_col(const void *, unsigned int, unsigned int, unsigned int, bool *);
 
@@ -197,7 +198,7 @@ get_record(unsigned int file_addr, void *dst)
 }
 
 template<size_t PAGESIZE, unsigned int BUFFER_NUM_ROW, unsigned int BUFFER_NUM_COL, unsigned int BUFFER_SLOT_NUM>
-inline const DataPage<PAGESIZE>* RecordFile<PAGESIZE, BUFFER_NUM_ROW, BUFFER_NUM_COL, BUFFER_SLOT_NUM>::get_data_page(unsigned int page_id)
+inline DataPage<PAGESIZE>* RecordFile<PAGESIZE, BUFFER_NUM_ROW, BUFFER_NUM_COL, BUFFER_SLOT_NUM>::get_data_page(unsigned int page_id)
 {
 	return get_page(page_id, PAGEBUFFER_READ);
 }
@@ -301,8 +302,8 @@ PageBuffer::get(unsigned int page_id, unsigned char mode)
 	// Cache miss 
 	// 1. Page ID inconsistent
 	// 2. Page not using
-	if (mBufferPageID[buffer_id] != page_id || 
-		!(mBufferSlotInfo[buffer_id] & BIT_USING))
+	if ((mBufferPageID[buffer_id] != page_id || 
+		!(mBufferSlotInfo[buffer_id] & BIT_USING)))
 	{
 		load(buffer_id, page_id);
 	}
@@ -339,6 +340,7 @@ PageBuffer::load(unsigned int buffer_id, unsigned int page_id)
 
 	// Set using bit
 	mBufferSlotInfo[buffer_id] |= BIT_USING;
+	mBufferPageID[buffer_id] = page_id;
 
 	// Bring page in
 	// NOTE: assume rowsize not change

@@ -42,7 +42,7 @@ public:
 	inline bool read_int_at(int row_id, size_t row_offset, void *dst);
 	inline bool read_varchar_at(int row_id, size_t row_offset, void *dst, size_t len);
 
-	const unsigned char *get_data_row(unsigned int row_id) const;
+	unsigned char *get_data_row(unsigned int row_id) const;
 
 	inline void write_back(FILE *file, size_t offset);
 	inline void read_at(FILE *file, size_t offset);
@@ -54,6 +54,7 @@ public:
 
 	inline bool isUsed(int row_id);
 	inline bool isFull();
+	inline void clear();
 	inline unsigned int get_row_count() const;
 
 	void dump_info();
@@ -89,7 +90,7 @@ DataPage<PAGESIZE>::DataPage(size_t rowsize)
 {
 	mpRowCount = (unsigned short*)(mData + mMaxRowCount * sizeof(unsigned char));
 	mDataSegBegin = ((unsigned char*)mpRowCount) + sizeof(unsigned short);
-	memset(mData, ROW_FREE, mMaxRowCount);
+	memset(mData, 0, PAGESIZE);
 
 	*mpRowCount = 0;
 
@@ -119,7 +120,7 @@ inline void DataPage<PAGESIZE>::init(size_t rowsize)
 	mMaxRowCount = PAGESIZE / (rowsize + sizeof(unsigned char));
 	mpRowCount = (unsigned short*)(mData + mMaxRowCount * sizeof(unsigned char));
 	mDataSegBegin = ((unsigned char*)mpRowCount) + sizeof(unsigned short);
-	memset(mData, ROW_FREE, mMaxRowCount);
+	memset(mData, 0, PAGESIZE);
 	*mpRowCount = 0;
 }
 
@@ -188,7 +189,7 @@ inline bool DataPage<PAGESIZE>::read_varchar_at(int row_id, size_t row_offset, v
 }
 
 template<size_t PAGESIZE>
-inline const unsigned char * DataPage<PAGESIZE>::get_data_row(unsigned int row_id) const
+inline unsigned char * DataPage<PAGESIZE>::get_data_row(unsigned int row_id) const
 {
 	assert(row_id >= 0 && row_id < *mpRowCount);
 	return get_row_addr(row_id);
@@ -282,6 +283,13 @@ inline bool DataPage<PAGESIZE>::isFull()
 }
 
 template<size_t PAGESIZE>
+inline void DataPage<PAGESIZE>::clear()
+{
+	memset(mData, 0, PAGESIZE);
+	*mpRowCount = 0;
+}
+
+template<size_t PAGESIZE>
 inline unsigned int DataPage<PAGESIZE>::get_row_count() const
 {
 	return *mpRowCount;
@@ -299,9 +307,10 @@ void DataPage<PAGESIZE>::dump_info()
 template<size_t PAGESIZE>
 inline int DataPage<PAGESIZE>::find_free_row()
 {
-	if (*mpRowCount < mMaxRowCount && mData[*mpRowCount] == ROW_FREE)
+	if (*mpRowCount < mMaxRowCount)
 	{
-		return *mpRowCount;
+		if(mData[*mpRowCount] == ROW_FREE)
+			return *mpRowCount;
 	}
 #ifdef _DELETION
 	else if (!mFreeRowQueue.empty())

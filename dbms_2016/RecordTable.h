@@ -4,10 +4,32 @@
 #include "BitmapPageFreeMapFile.h"
 #include "TableFile.h"
 
+#define FAST_ITERATOR_ERROR_COL -1
+
 template <unsigned int PAGESIZE>
 class RecordTable
 {
 public:
+	/*
+		fast_iterator
+
+		do not insert anything within one iteration
+	*/
+	struct fast_iterator
+	{
+	public:
+		fast_iterator(RecordTable*);
+		~fast_iterator();
+		
+		unsigned char *next();
+	private:
+		RecordTable *table;
+
+		unsigned int page_id;
+		unsigned int row_id;
+		DataPage<PAGESIZE> *cur_page;
+	};
+
 	RecordTable();
 	~RecordTable();
 
@@ -15,8 +37,11 @@ public:
 	inline void create(const char *, unsigned int attrNum, table_attr_desc_t *, int);
 	inline void insert(void *);
 	inline bool select_show(const char **, unsigned int);
-	inline bool select_copy(const char **, unsigned int, void *, size_t);
+	
+	BitmapPageFreeMapFile<PAGESIZE> &freemap();
+	RecordFile<PAGESIZE> &records();
 
+	inline void print_record(table_attr_desc_t **, unsigned int, const unsigned char *);
 	void save_table();
 	void save_record();
 	void save_freemap();
@@ -26,7 +51,6 @@ private:
 	BitmapPageFreeMapFile<PAGESIZE> mFreemapFile;
 
 	inline void open_all(const char *, const char *);
-	inline void print_record(table_attr_desc_t **, unsigned int, const unsigned char *);
 	inline bool check_duplicated(const void *src);
 };
 
@@ -139,25 +163,15 @@ inline bool RecordTable<PAGESIZE>::select_show(const char **pColDescs, unsigned 
 }
 
 template<unsigned int PAGESIZE>
-inline bool RecordTable<PAGESIZE>::select_copy(const char **pColDescs, unsigned int colNum, void *dst, size_t dstSize)
+inline BitmapPageFreeMapFile<PAGESIZE>& RecordTable<PAGESIZE>::freemap()
 {
-	//unsigned int maxPageID = mFreemapFile.get_max_page_id();
+	return mFreemapFile;
+}
 
-	//table_attr_desc_t **pDescs = new table_attr_desc_t*[colNum];
-	//if (!mTableFile.get_attr_descs(pColDescs, colNum, pDescs))
-	//	return false;
-
-	//for (int i = 0; i <= maxPageID; i++)
-	//{
-	//	const DataPage<PAGESIZE> *page = mRecordFile.get_data_page(i);
-	//	for (int j = 0; j < page->get_row_count(); j++)
-	//	{
-	//	
-	//	}
-	//}
-	//delete[] pDescs;
-
-	return true;
+template<unsigned int PAGESIZE>
+inline RecordFile<PAGESIZE>& RecordTable<PAGESIZE>::records() 
+{
+	return mRecordFile;
 }
 
 template<unsigned int PAGESIZE>
@@ -245,4 +259,40 @@ inline bool RecordTable<PAGESIZE>::check_duplicated(const void * src)
 		
 	}
 	return isDuplicate;
+}
+
+template<unsigned int PAGESIZE>
+inline RecordTable<PAGESIZE>::fast_iterator::fast_iterator(RecordTable *pTable)
+	: table(pTable), page_id(0), row_id(0)
+{
+	assert(table != NULL);
+	cur_page = table->records().get_data_page(page_id);
+}
+
+template<unsigned int PAGESIZE>
+inline RecordTable<PAGESIZE>::fast_iterator::~fast_iterator()
+{
+}
+
+template<unsigned int PAGESIZE>
+inline unsigned char * RecordTable<PAGESIZE>::fast_iterator::next()
+{
+	do
+	{
+		assert(cur_page != NULL);
+
+		if(row_id < cur_page->get_row_count())
+		{
+			return cur_page->get_data_row(row_id++);
+		}
+		else
+		{
+			// No row remaining
+			page_id++;
+			row_id = 0;
+			cur_page = table->records().get_data_page(page_id);
+		}
+	} while (page_id <= table->freemap().get_max_page_id());
+
+	return NULL;
 }

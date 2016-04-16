@@ -47,10 +47,12 @@ void test_recordtable_primarykey();
 void test_dbms_table_create();
 void test_dbms_table_read();
 void test_dbms_table_create_duplicate();
+void test_dbms_table_iterator();
 
 int main(int argc, char *argv[])
 {
-	test_dbms_table_create_duplicate();
+	test_dbms_table_create();
+	test_dbms_table_iterator();
 	system("pause");
 
 	return 0;
@@ -345,7 +347,16 @@ void test_dbms_table_create()
 		rt->insert(&record);
 		record.id++;
 	}
-	rt->select_show(cols, 3);
+
+	record.id = 1;
+	dbf.create_table("test_table2", descs, 4, -1);
+
+	RecordTable<PAGESIZE_8K> *rt2 = dbf.get_table("test_table2");
+	for (int i = 0; i < 10; i++)
+	{
+		rt2->insert(&record);
+		record.id++;
+	}
 
 	dbf.write_back();
 }
@@ -387,4 +398,40 @@ void test_dbms_table_create_duplicate()
 	rt->select_show(cols, 3);
 
 	dbf.write_back();
+}
+
+void test_dbms_table_iterator()
+{
+	DatabaseFile<PAGESIZE_8K> dbf;
+	dbf.open("test.dbs", "r+");
+	dbf.read_from();
+
+	table_attr_desc_t descs[4] = {
+		{ "ID", ATTR_TYPE_INTEGER, offsetof(structure_record, id), 4 },
+		{ "Name", ATTR_TYPE_VARCHAR, offsetof(structure_record, name), 40 },
+		{ "Addr", ATTR_TYPE_VARCHAR, offsetof(structure_record, addr), 5 },
+		{ "Gender", ATTR_TYPE_INTEGER, offsetof(structure_record, gender), 4 }
+	};
+
+	table_attr_desc_t *pDescs[4] = {
+		&descs[0],
+		&descs[1],
+		&descs[2],
+		&descs[3]
+	};
+
+	RecordTable<PAGESIZE_8K> *rt1 = dbf.get_table("test_table1");
+	RecordTable<PAGESIZE_8K>::fast_iterator it1(rt1);
+
+	unsigned char *record1, *record2;
+	while ((record1 = it1.next()) != NULL)
+	{
+		RecordTable<PAGESIZE_8K> *rt2 = dbf.get_table("test_table2");
+		RecordTable<PAGESIZE_8K>::fast_iterator it2(rt2);
+		while ((record2 = it2.next()) != NULL)
+		{
+			rt2->print_record(pDescs, 4, record2);
+		}
+		rt1->print_record(pDescs, 4, record1);
+	}
 }

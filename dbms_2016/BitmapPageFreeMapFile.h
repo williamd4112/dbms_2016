@@ -83,14 +83,28 @@ inline unsigned int BitmapPageFreeMapFile<PAGESIZE, FILESIZE, MAXNUMPAGE>::get_f
 {
 	unsigned int maxPageIndex = mDiskPart.mCurMaxPage;
 
+#ifndef _DELETION
+	while (maxPageIndex < MAXNUMPAGE)
+	{
+		if (!mDiskPart.mBitmap.Test(maxPageIndex))
+		{
+			mDiskPart.mCurMaxPage = maxPageIndex;
+			return maxPageIndex;
+		}
+		else
+			maxPageIndex++;
+	}
+#else
 	do {
 		maxPageIndex %= MAXNUMPAGE;
-		if (!mDiskPart.mBitmap.Test(maxPageIndex))
+		if (!mDiskPart.mBitmap.Test(maxPageIndex)) {
+			mDiskPart.mCurMaxPage = maxPageIndex;
 			return maxPageIndex;
+		}
 		else
 			maxPageIndex++;
 	} while (maxPageIndex != mDiskPart.mCurMaxPage);
-	mDiskPart.mCurMaxPage = maxPageIndex;
+#endif
 
 	throw PAGEFREEMAPFILE_NO_FREE_PAGE;
 }
