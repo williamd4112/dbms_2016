@@ -16,3 +16,9 @@ void FileUtil::read_at(FILE * file, size_t offset, void * dst, size_t dst_size)
 	fread(dst, dst_size, 1, file);
 }
 
+bool FileUtil::exist(const char *filename)
+{
+	struct stat buffer;
+	return stat(filename, &buffer) == 0;
+}
+

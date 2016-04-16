@@ -1,7 +1,10 @@
 #pragma once
 
 #include "DiskFile.h"
+#include "sql/CreateStatement.h"
+
 #include <unordered_map>
+#include <vector>
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
@@ -18,6 +21,10 @@
 
 #define ATTR_CONSTRAINT_NO 0x0
 #define ATTR_CONSTRAINT_PRIMARY_KEY 0x1
+
+#define ROW_SIZE_MAX (ATTR_NUM_MAX * ATTR_SIZE_MAX)
+
+#define TABLEFILE_EXCEPTION_TOO_MANY_PK -1
 
 /*
 	table_attr_desc_t
@@ -72,6 +79,8 @@ public:
 	const unsigned int get_row_size() const;
 
 	void init(const char *, unsigned int, table_attr_desc_t *, int);
+	void init(const char *, unsigned int, table_attr_desc_t *);
+	void init(const char *, std::vector<sql::ColumnDefinition*> &);
 	inline void write_back();
 	inline void read_from();
 

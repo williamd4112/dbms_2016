@@ -35,16 +35,23 @@ public:
 
 	inline void load(const char *);
 	inline void create(const char *, unsigned int attrNum, table_attr_desc_t *, int);
-	inline void insert(void *);
+	inline void create(const char *, unsigned int attrNum, table_attr_desc_t *);
+	inline void create(const char *, std::vector<sql::ColumnDefinition*>&);
+	inline bool insert(void *);
 	inline bool select_show(const char **, unsigned int);
 	
 	BitmapPageFreeMapFile<PAGESIZE> &freemap();
 	RecordFile<PAGESIZE> &records();
+	TableFile &get_table() { return mTableFile; }
 
+	inline unsigned int get_row_size();
 	inline void print_record(table_attr_desc_t **, unsigned int, const unsigned char *);
 	void save_table();
 	void save_record();
 	void save_freemap();
+
+	void dump_info();
+	void dump_content();
 private:
 	TableFile mTableFile;
 	RecordFile<PAGESIZE> mRecordFile;
@@ -77,6 +84,11 @@ inline void RecordTable<PAGESIZE>::load(const char *tablename)
 	mRecordFile.init(mTableFile.get_row_size());
 }
 
+/*
+	create
+
+	@Deprecated: no passing primary key in new version
+*/
 template<unsigned int PAGESIZE>
 inline void RecordTable<PAGESIZE>::create(const char *tablename, unsigned int attrNum, table_attr_desc_t *pDescs, int primaryKeyIndex)
 {
@@ -86,14 +98,31 @@ inline void RecordTable<PAGESIZE>::create(const char *tablename, unsigned int at
 }
 
 template<unsigned int PAGESIZE>
-inline void RecordTable<PAGESIZE>::insert(void * src)
+inline void RecordTable<PAGESIZE>::create(const char *tablename, unsigned int attrNum, table_attr_desc_t *pDescs)
+{
+	open_all(tablename, "wb+");
+	mTableFile.init(tablename, attrNum, pDescs);
+	mRecordFile.init(mTableFile.get_row_size());
+}
+
+template<unsigned int PAGESIZE>
+inline void RecordTable<PAGESIZE>::create(const char *tablename, std::vector<sql::ColumnDefinition*>& col_defs)
+{
+	open_all(tablename, "wb+");
+	mTableFile.init(tablename, col_defs);
+	mRecordFile.init(mTableFile.get_row_size());
+}
+
+template<unsigned int PAGESIZE>
+inline bool RecordTable<PAGESIZE>::insert(void * src)
 {
 	if (check_duplicated(src))
 	{
 		printf("RecordTable::insert(): insert failed, duplicate record\n");
-		return;
+		return false;
 	}
 
+	bool success = true;
 	try
 	{
 		unsigned int free_page_id = mFreemapFile.get_free_page();
@@ -103,16 +132,21 @@ inline void RecordTable<PAGESIZE>::insert(void * src)
 		// TODO: make use the addr in index
 		unsigned int addr = mRecordFile.put_record(free_page_id, src, &result);
 		
-#ifndef NDEBUG
+		/// TODO: handling error better
 		if (result & BIT_SUCCESS)
 		{
+#ifndef NDEBUG
 			printf("RecordTable::insert(): insert success.\n");
+#endif
 		}
 		else
 		{
+#ifndef NDEBUG
 			printf("RecordTable::insert(): insert fail.\n");
-		}
 #endif
+			success = false;
+		}
+
 
 		if (result & BIT_PUT_FULL)
 		{
@@ -122,8 +156,9 @@ inline void RecordTable<PAGESIZE>::insert(void * src)
 	catch (int e)
 	{
 		fprintf(stderr, "RecordTable::insert(): no enough space.\n");
+		success = false;
 	}
-	
+	return success;
 }
 
 /*
@@ -193,6 +228,32 @@ inline void RecordTable<PAGESIZE>::save_freemap()
 }
 
 template<unsigned int PAGESIZE>
+inline void RecordTable<PAGESIZE>::dump_info()
+{
+	mTableFile.dump_info();
+}
+
+template<unsigned int PAGESIZE>
+inline void RecordTable<PAGESIZE>::dump_content()
+{
+	RecordTable<PAGESIZE>::fast_iterator it(this);
+	
+	table_attr_desc_t **pPDescs = new table_attr_desc_t*[mTableFile.get_table_header().attrNum];
+	for (int i = 0; i < mTableFile.get_table_header().attrNum; i++)
+	{
+		pPDescs[i] = mTableFile.get_attr_desc(i);
+	}
+
+	unsigned char *record;
+	while ((record = it.next()) != NULL)
+	{
+		print_record(pPDescs, mTableFile.get_table_header().attrNum, record);
+	}
+	
+	delete [] pPDescs;
+}
+
+template<unsigned int PAGESIZE>
 inline void RecordTable<PAGESIZE>::open_all(const char *tablename, const char *mode)
 {
 	std::string tablename_str(tablename);
@@ -211,6 +272,12 @@ inline void RecordTable<PAGESIZE>::open_all(const char *tablename, const char *m
 }
 
 template<unsigned int PAGESIZE>
+inline unsigned int RecordTable<PAGESIZE>::get_row_size()
+{
+	return mTableFile.get_row_size();
+}
+
+template<unsigned int PAGESIZE>
 inline void RecordTable<PAGESIZE>::print_record(table_attr_desc_t **pDesc, unsigned int descNum, const unsigned char *src)
 {
 	int int_val;
@@ -225,7 +292,10 @@ inline void RecordTable<PAGESIZE>::print_record(table_attr_desc_t **pDesc, unsig
 		else if (pDesc[i]->type == ATTR_TYPE_VARCHAR)
 		{
 			memcpy(varchar_val, &src[pDesc[i]->offset], pDesc[i]->size);
-			printf("%s\t",varchar_val);
+			if (strlen(varchar_val) <= 0)
+				printf("NULL\t");
+			else
+				printf("%s\t",varchar_val);
 		}
 		else
 		{
@@ -244,6 +314,7 @@ inline bool RecordTable<PAGESIZE>::check_duplicated(const void * src)
 	if (pkIndex < 0)
 	{
 		// When no primary key
+
 		mRecordFile.find_record(src, mFreemapFile.get_max_page_id(), &isDuplicate);
 	}
 	else

@@ -6,6 +6,7 @@
 
 #define get_val_uint32(val, low, high) ((val) >> (low)) & ((1 << ((high) - (low) + 1)) - 1)
 
+void printm(void *src, unsigned int size);
 
 template <unsigned int BIT_NUM,
 	unsigned int PARTITION_NUM = BIT_NUM / 8 + 1>

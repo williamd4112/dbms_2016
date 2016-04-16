@@ -1,4 +1,5 @@
 #include <iostream>
+#include <string>
 
 #include "DataPage.h"
 #include "BitmapPageFreeMapFile.h"
@@ -7,6 +8,14 @@
 #include "RecordTable.h"
 #include "DatabaseFile.h"
 #include "Bit.h"
+#include "Database.h"
+
+#include "SQLParser.h"
+#include "SQLParserResult.h"
+#include "sqlhelper.h"
+
+using namespace std;
+using namespace sql;
 
 #pragma pack(push)
 #pragma pack(1)
@@ -17,6 +26,8 @@ struct structure_record {
 	int gender;
 };
 #pragma pack(pop)
+
+void test_dbms_parser_create_table();
 
 void test_datapage();
 void test_freemapfile();
@@ -51,11 +62,69 @@ void test_dbms_table_iterator();
 
 int main(int argc, char *argv[])
 {
-	test_dbms_table_create();
-	test_dbms_table_iterator();
+	//test_dbms_table_create();
+	//test_dbms_table_iterator();
+	//test_dbms_parser_create_table();
+	Database<PAGESIZE_8K> db("test_db.dbs");
+	db.execute(std::string("CREATE TABLE book (id int primary key, name varchar(20), price int);"));
+	db.execute(std::string("INSERT INTO book VALUES (1, \'hello\', 10);"));
+	db.execute(std::string("INSERT INTO book VALUES (1, \'hell2\', 15);")); // check duplicate
+	db.execute(std::string("INSERT INTO book VALUES (2, \'hello\', 20);"));
+	db.execute(std::string("INSERT INTO book VALUES (3, \'hello\', 90);"));
+	db.execute(std::string("INSERT INTO book (name, id) VALUES (\'hello\', 4);")); // Check random insertion
+	db.execute(std::string("INSERT INTO book (price, name, id) VALUES (50, \'hello\', 5);")); // Check random insertion
+	db.execute(std::string("INSERT INTO book (name) VALUES (\'hello\');")); // Check int default value
+	db.execute(std::string("INSERT INTO book (id) VALUES (15);")); // Check varchar default value
+
 	system("pause");
 
 	return 0;
+}
+
+void test_dbms_parser_create_table()
+{
+	std::string query;
+Parse:
+	std::getline(std::cin, query);
+
+	sql::SQLParserResult *parser = sql::SQLParser::parseSQLString(query);
+
+	if (parser->isValid)
+	{
+		printf("valid\n");
+		for (sql::SQLStatement *stmt : parser->statements)
+		{
+			sql::SelectStatement* se_st;
+			sql::InsertStatement* in_st;
+			sql::CreateStatement* cr_st;
+			switch (stmt->type()) 
+			{
+				case sql::kStmtSelect:
+					se_st = (sql::SelectStatement*)stmt;
+					std::cout << se_st->hasAggregation() << std::endl;
+					//cout << "se_st " << se_st->aggregation_list->front()->attribute << endl;
+					break;
+				case sql::kStmtInsert:
+					in_st = (sql::InsertStatement*)stmt;
+					break;
+				case sql::kStmtCreate:
+					cr_st = (sql::CreateStatement*)stmt;
+					cout << "cr_st ,Test" << cr_st->columns->front()->length << endl;
+					cout << "cr_st " << cr_st->tableName << endl;
+					cout << "cr_st " << cr_st->columns->front()->length << endl;
+					cout << "cr_st " << cr_st->columns->front()->name << endl;
+					cout << "cr_st " << cr_st->columns->front()->type << endl;
+					break;
+				default:
+					break;
+			}
+		}
+	}
+	else
+	{
+		printf("invalid\n");
+	}
+	goto Parse;
 }
 
 void test_datapage()
@@ -424,14 +493,12 @@ void test_dbms_table_iterator()
 	RecordTable<PAGESIZE_8K>::fast_iterator it1(rt1);
 
 	unsigned char *record1, *record2;
+	unsigned int count = 0;
 	while ((record1 = it1.next()) != NULL)
 	{
-		RecordTable<PAGESIZE_8K> *rt2 = dbf.get_table("test_table2");
-		RecordTable<PAGESIZE_8K>::fast_iterator it2(rt2);
-		while ((record2 = it2.next()) != NULL)
-		{
-			rt2->print_record(pDescs, 4, record2);
-		}
+		count += get_int_from_record(record1, descs[3].offset);
+
 		rt1->print_record(pDescs, 4, record1);
 	}
+	printf("Count: %d\n",count);
 }

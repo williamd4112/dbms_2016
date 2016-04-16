@@ -12,6 +12,8 @@
 #define ROW_USED 0xff
 #define ROW_FREE 0x00
 
+int get_int_from_record(const unsigned char *, int);
+
 template <size_t PAGESIZE>
 /*
 	Page
@@ -130,7 +132,7 @@ inline int DataPage<PAGESIZE>::write_row(void * src)
 	int free_id = find_free_row();
 	if (free_id < 0)
 		return -1;
-
+	
 	memcpy(mDataSegBegin + mRowsize * free_id, src, mRowsize);
 	mData[free_id] = ROW_USED;
 	*mpRowCount = *mpRowCount + 1;

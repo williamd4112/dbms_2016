@@ -75,6 +75,7 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>C:\Users\User\Documents\Visual Studio 2015\Projects\sqlparser-master\Project1\Project1;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -98,6 +99,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>C:\Users\User\Documents\Visual Studio 2015\Projects\sqlparser-master\Project1\Project1;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -120,6 +122,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\sqlparser-master\Project1\Project1\parser\bison_parser.cpp" />
+    <ClCompile Include="..\..\sqlparser-master\Project1\Project1\parser\flex_lexer.cpp" />
+    <ClCompile Include="..\..\sqlparser-master\Project1\Project1\SQLParser.cpp" />
+    <ClCompile Include="..\..\sqlparser-master\Project1\Project1\SQLParserResult.cpp" />
+    <ClCompile Include="..\..\sqlparser-master\Project1\Project1\sql\destruct.cpp" />
+    <ClCompile Include="..\..\sqlparser-master\Project1\Project1\sql\Expr.cpp" />
     <ClCompile Include="Bit.cpp" />
     <ClCompile Include="Condition.cpp" />
     <ClCompile Include="Database.cpp" />
@@ -139,6 +147,20 @@
     <ClCompile Include="View.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\sqlparser-master\Project1\Project1\parser\bison_parser.h" />
+    <ClInclude Include="..\..\sqlparser-master\Project1\Project1\parser\flex_lexer.h" />
+    <ClInclude Include="..\..\sqlparser-master\Project1\Project1\parser\parser_typedef.h" />
+    <ClInclude Include="..\..\sqlparser-master\Project1\Project1\SQLParser.h" />
+    <ClInclude Include="..\..\sqlparser-master\Project1\Project1\SQLParserResult.h" />
+    <ClInclude Include="..\..\sqlparser-master\Project1\Project1\sql\CreateStatement.h" />
+    <ClInclude Include="..\..\sqlparser-master\Project1\Project1\sql\Expr.h" />
+    <ClInclude Include="..\..\sqlparser-master\Project1\Project1\sql\InsertStatement.h" />
+    <ClInclude Include="..\..\sqlparser-master\Project1\Project1\sql\PrepareStatement.h" />
+    <ClInclude Include="..\..\sqlparser-master\Project1\Project1\sql\SelectStatement.h" />
+    <ClInclude Include="..\..\sqlparser-master\Project1\Project1\sql\SQLStatement.h" />
+    <ClInclude Include="..\..\sqlparser-master\Project1\Project1\sql\statements.h" />
+    <ClInclude Include="..\..\sqlparser-master\Project1\Project1\sql\Table.h" />
+    <ClInclude Include="..\Project1\Project1\sql\Table.h" />
     <ClInclude Include="Bit.h" />
     <ClInclude Include="Condition.h" />
     <ClInclude Include="Database.h" />
@@ -152,7 +174,6 @@
     <ClInclude Include="RecordBuffer.h" />
     <ClInclude Include="RecordFile.h" />
     <ClInclude Include="RecordTable.h" />
-    <ClInclude Include="resource.h" />
     <ClInclude Include="system.h" />
     <ClInclude Include="TableFile.h" />
     <ClInclude Include="View.h" />

@@ -1,5 +1,6 @@
 #include "TableFile.h"
 #include "FileUtil.h"
+#include "system.h"
 
 #include <cassert>
 
@@ -88,6 +89,68 @@ void TableFile::init(const char *name, unsigned int num, table_attr_desc_t *pDes
 	build_index();
 }
 
+void TableFile::init(const char *name, unsigned int num, table_attr_desc_t *pDescs)
+{
+	assert(name != NULL && num > 0);
+
+	strncpy(mHeader.name, name, TABLE_NAME_MAX);
+	
+	mHeader.attrNum = num;
+	mHeader.rowsize = 0;
+	mHeader.primaryKeyIndex = -1; // No PK
+
+	mAttrDescs = new table_attr_desc_t[num];
+	for (int i = 0; i < num; i++)
+	{
+		mAttrDescs[i] = pDescs[i];
+
+		if (mAttrDescs[i].constraint & ATTR_CONSTRAINT_PRIMARY_KEY)
+		{
+			if (mHeader.primaryKeyIndex != -1)
+				throw TABLEFILE_EXCEPTION_TOO_MANY_PK;
+			mHeader.primaryKeyIndex = i;
+		}
+	
+		mHeader.rowsize += mAttrDescs[i].size;
+	}
+	build_index();
+}
+
+void TableFile::init(const char *name, std::vector<sql::ColumnDefinition*>& col_defs)
+{
+	assert(name != NULL && col_defs.size() > 0);
+
+	strncpy(mHeader.name, name, TABLE_NAME_MAX);
+
+	mHeader.attrNum = col_defs.size();
+	mHeader.rowsize = 0;
+	mHeader.primaryKeyIndex = -1; // No PK
+
+	mAttrDescs = new table_attr_desc_t[mHeader.attrNum];
+
+	unsigned int offset = 0;
+	for (int i = 0; i < col_defs.size(); i++)
+	{
+		strncpy(mAttrDescs[i].name, col_defs[i]->name, ATTR_NAME_MAX);
+		mAttrDescs[i].offset = offset;
+		mAttrDescs[i].size = col_defs[i]->length;
+		mAttrDescs[i].type = (col_defs[i]->type == sql::ColumnDefinition::INT) ? ATTR_TYPE_INTEGER : ATTR_TYPE_VARCHAR;
+		mAttrDescs[i].constraint = col_defs[i]->IsPK ? ATTR_CONSTRAINT_PRIMARY_KEY : 0x0;
+
+		if (mAttrDescs[i].constraint & ATTR_CONSTRAINT_PRIMARY_KEY)
+		{
+			if (mHeader.primaryKeyIndex != -1)
+				sub_error("Assign two primary key, use first one.");
+			else
+				mHeader.primaryKeyIndex = i;
+		}
+
+		mHeader.rowsize += mAttrDescs[i].size;
+		offset += mAttrDescs[i].size;
+	}
+	build_index();
+}
+
 inline void TableFile::write_back()
 {
 	FileUtil::write_back(mFile, 0, &mHeader, sizeof(table_header_t));
@@ -111,9 +174,15 @@ void TableFile::dump_info()
 	printf("Table Name: %s\n",mHeader.name);
 	printf("Table Attr num: %d\n",mHeader.attrNum);
 	printf("Table Row Size: %d\n",mHeader.rowsize);
+	printf("Name\tType\tOffset\tSize\tPrimaryKey\n");
 	for (int i = 0; i < mHeader.attrNum; i++)
 	{
-		printf("[%s\t%s\t%d\t%d]\n",mAttrDescs[i].name, kAttrTypeNames[mAttrDescs[i].type], mAttrDescs[i].offset,mAttrDescs[i].size);
+		printf("%s\t%s\t%d\t%d\t%d\n",
+			mAttrDescs[i].name, 
+			kAttrTypeNames[mAttrDescs[i].type], 
+			mAttrDescs[i].offset,
+			mAttrDescs[i].size,
+			(mAttrDescs[i].constraint & ATTR_CONSTRAINT_PRIMARY_KEY ? 1 : 0));
 	}
 }
 
