@@ -76,7 +76,8 @@ inline BitmapPageFreeMapFile<PAGESIZE, FILESIZE, MAXNUMPAGE>::~BitmapPageFreeMap
 /*
 	get_free_page
 	
-	Start scanning from last available position, end when scanning all page.
+	Start scanning from last available position, end when scanning last page.
+	(for now, we don't need to consider fragmentation)
 */
 template<size_t PAGESIZE, size_t FILESIZE, unsigned int MAXNUMPAGE>
 inline unsigned int BitmapPageFreeMapFile<PAGESIZE, FILESIZE, MAXNUMPAGE>::get_free_page()

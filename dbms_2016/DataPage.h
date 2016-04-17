@@ -71,6 +71,7 @@ private:
 	unsigned char *mDataSegBegin;
 	
 	/* Start of row_count */
+	/// TODO: replace mpRowCount direct with ma
 	unsigned short *mpRowCount;
 
 #ifdef _DELETION

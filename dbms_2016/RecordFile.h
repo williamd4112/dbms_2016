@@ -155,16 +155,13 @@ put_record(unsigned int page_id, void *src, unsigned char *result)
 	DataPage<PAGESIZE> *page = get_page(page_id, PAGEBUFFER_WRITE);
 	
 	assert(page != NULL);
+	assert(result != NULL);
 
 	*result = 0x0;
 
 	// Put record
 	int page_offset = page->write_row(src);
-	if (page_offset < 0)
-	{
-		assert(result != NULL);
-	}
-	else
+	if (page_offset >= 0)
 	{
 		page_id = get_page_addr(page_id, page_offset);
 		*result |= BIT_SUCCESS;

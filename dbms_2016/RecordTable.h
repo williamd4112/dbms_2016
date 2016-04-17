@@ -42,9 +42,10 @@ public:
 	
 	BitmapPageFreeMapFile<PAGESIZE> &freemap();
 	RecordFile<PAGESIZE> &records();
-	TableFile &get_table() { return mTableFile; }
+	TableFile &tablefile() { return mTableFile; }
 
 	inline unsigned int get_row_size();
+	inline const char *get_name();
 	inline void print_record(table_attr_desc_t **, unsigned int, const unsigned char *);
 	void save_table();
 	void save_record();
@@ -113,6 +114,13 @@ inline void RecordTable<PAGESIZE>::create(const char *tablename, std::vector<sql
 	mRecordFile.init(mTableFile.get_row_size());
 }
 
+/*
+	insert
+
+	src is a pointer to insertion data
+	first, check if there is a duplicated record (for now, use exhaustive search)
+	
+*/
 template<unsigned int PAGESIZE>
 inline bool RecordTable<PAGESIZE>::insert(void * src)
 {
@@ -147,7 +155,7 @@ inline bool RecordTable<PAGESIZE>::insert(void * src)
 			success = false;
 		}
 
-
+		// Mark current max page as full, so that next time calling get_free_page_id we can advance page id
 		if (result & BIT_PUT_FULL)
 		{
 			mFreemapFile.set_page_full(free_page_id);
@@ -278,10 +286,16 @@ inline unsigned int RecordTable<PAGESIZE>::get_row_size()
 }
 
 template<unsigned int PAGESIZE>
+inline const char * RecordTable<PAGESIZE>::get_name()
+{
+	return mTableFile.get_table_header().name;
+}
+
+template<unsigned int PAGESIZE>
 inline void RecordTable<PAGESIZE>::print_record(table_attr_desc_t **pDesc, unsigned int descNum, const unsigned char *src)
 {
 	int int_val;
-	char varchar_val[ATTR_SIZE_MAX];
+	char varchar_val[ATTR_SIZE_MAX + 1];
 	for (int i = 0; i < descNum; i++)
 	{
 		if (pDesc[i]->type == ATTR_TYPE_INTEGER)
@@ -314,12 +328,11 @@ inline bool RecordTable<PAGESIZE>::check_duplicated(const void * src)
 	if (pkIndex < 0)
 	{
 		// When no primary key
-
 		mRecordFile.find_record(src, mFreemapFile.get_max_page_id(), &isDuplicate);
 	}
 	else
 	{
-		// Get field value from srcc
+		// Get field value from src
 		const table_attr_desc_t *desc = mTableFile.get_attr_desc(pkIndex);
 		const unsigned char *col_src = (const unsigned char *)src;
 		mRecordFile.find_record_with_col(col_src + desc->offset, 
