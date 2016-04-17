@@ -74,7 +74,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_DEBUG_SELECT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>C:\Users\User\Documents\Visual Studio 2015\Projects\sqlparser-master\Project1\Project1;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
@@ -98,7 +98,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_DEBUG_SELECT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>C:\Users\User\Documents\Visual Studio 2015\Projects\sqlparser-master\Project1\Project1;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
@@ -138,8 +138,8 @@
     <ClCompile Include="HashIndexFile.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="DataPage.cpp" />
+    <ClCompile Include="QueryExecution.cpp" />
     <ClCompile Include="Record.cpp" />
-    <ClCompile Include="RecordBuffer.cpp" />
     <ClCompile Include="RecordFile.cpp" />
     <ClCompile Include="RecordTable.cpp" />
     <ClCompile Include="system.cpp" />
@@ -170,8 +170,8 @@
     <ClInclude Include="DataPage.h" />
     <ClInclude Include="BitmapPageFreeMapFile.h" />
     <ClInclude Include="HashIndexFile.h" />
+    <ClInclude Include="QueryExecution.h" />
     <ClInclude Include="Record.h" />
-    <ClInclude Include="RecordBuffer.h" />
     <ClInclude Include="RecordFile.h" />
     <ClInclude Include="RecordTable.h" />
     <ClInclude Include="system.h" />
