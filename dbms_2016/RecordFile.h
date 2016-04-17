@@ -99,6 +99,7 @@ public:
 	
 	inline unsigned int put_record(unsigned int ,void *, unsigned char *);
 	inline bool get_record(unsigned int, void *);
+	inline unsigned char *get_record(unsigned int);
 	inline DataPage<PAGESIZE> *get_data_page(unsigned int);
 	inline unsigned int find_record(const void *, unsigned int, bool *);
 	inline unsigned int find_record_with_col(const void *, unsigned int, unsigned int, unsigned int, bool *);
@@ -192,6 +193,17 @@ get_record(unsigned int file_addr, void *dst)
 	DataPage<PAGESIZE> *page = get_page(page_id, PAGEBUFFER_READ);
 
 	return page->read_row(page_offset, dst);
+}
+
+template<size_t PAGESIZE, unsigned int BUFFER_NUM_ROW, unsigned int BUFFER_NUM_COL, unsigned int BUFFER_SLOT_NUM>
+inline unsigned char * RecordFile<PAGESIZE, BUFFER_NUM_ROW, BUFFER_NUM_COL, BUFFER_SLOT_NUM>::get_record(unsigned int file_addr)
+{
+	unsigned int page_id = get_page_id(file_addr);
+	unsigned int page_offset = get_page_offset(file_addr);
+
+	DataPage<PAGESIZE> *page = get_page(page_id, PAGEBUFFER_READ);
+
+	return page->get_data_row(page_offset);
 }
 
 template<size_t PAGESIZE, unsigned int BUFFER_NUM_ROW, unsigned int BUFFER_NUM_COL, unsigned int BUFFER_SLOT_NUM>

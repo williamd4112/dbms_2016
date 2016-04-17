@@ -54,7 +54,7 @@ public:
 	inline int find_col_int(int src, unsigned int col_offset);
 	inline int find_col_varchar(char * src, unsigned int col_offset, unsigned int col_size);
 
-	inline bool isUsed(int row_id);
+	inline bool isUsed(int row_id) const;
 	inline bool isFull();
 	inline void clear();
 	inline unsigned int get_row_count() const;
@@ -195,7 +195,10 @@ template<size_t PAGESIZE>
 inline unsigned char * DataPage<PAGESIZE>::get_data_row(unsigned int row_id) const
 {
 	assert(row_id >= 0 && row_id < *mpRowCount);
-	return get_row_addr(row_id);
+	if (isUsed(row_id))
+		return get_row_addr(row_id);
+	else
+		return NULL;
 }
 
 template<size_t PAGESIZE>
@@ -272,7 +275,7 @@ inline int DataPage<PAGESIZE>::find_col_varchar(char * src, unsigned int col_off
 }
 
 template<size_t PAGESIZE>
-inline bool DataPage<PAGESIZE>::isUsed(int row_id)
+inline bool DataPage<PAGESIZE>::isUsed(int row_id) const
 {
 	if (row_id < 0 || row_id >= mMaxRowCount)
 		return true;

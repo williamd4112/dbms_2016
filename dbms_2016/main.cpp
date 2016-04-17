@@ -76,17 +76,19 @@ int main(int argc, char *argv[])
 	//db.execute(std::string("INSERT INTO book (price, name, id) VALUES (50, \'hello\', 5);")); // Check random insertion
 	//db.execute(std::string("INSERT INTO book (name) VALUES (\'hello\');")); // Check int default value
 	//db.execute(std::string("INSERT INTO book (id) VALUES (15);")); // Check varchar default value
-	//db.execute(std::string("INSERT INTO stu VALUES (1, \'hello\', 10);"));
-	//db.execute(std::string("INSERT INTO stu VALUES (1, \'hell2\', 15);")); // check duplicate
-	//db.execute(std::string("INSERT INTO stu VALUES (2, \'hello\', 20);"));
-	//db.execute(std::string("INSERT INTO stu VALUES (3, \'hello\', 90);"));
+	db.execute(std::string("INSERT INTO stu VALUES (1, \'Sell1\', 110);"));
+	db.execute(std::string("INSERT INTO stu VALUES (1, \'Sell2\', 15);")); // check duplicate
+	db.execute(std::string("INSERT INTO stu VALUES (2, \'Sell3\', 120);"));
+	db.execute(std::string("INSERT INTO stu VALUES (3, \'Sell4\', 130);"));
 	db.execute(std::string("INSERT INTO stu (name, id) VALUES (\'hello\', 4);")); // Check random insertion
 	db.execute(std::string("INSERT INTO stu (price, name, id) VALUES (50, \'hello\', 5);")); // Check random insertion
 	db.execute(std::string("INSERT INTO stu (name) VALUES (\'hello\');")); // Check int default value
 	db.execute(std::string("INSERT INTO stu (id) VALUES (15);")); // Check varchar default value
 	db.execute(std::string("SELECT id, name FROM book AS B, stu AS S;")); // Check select
 	db.execute(std::string("SELECT id, name FROM book AS B WHERE book.name = 'hell2' OR id > 2;")); // Check select
-	//db.shutdown();
+	db.execute(std::string("SELECT stu.name AS SNAME, stu.score, book.id, book.name FROM book AS B, stu AS S WHERE book.id = stu.id;")); // Check select
+	db.execute(std::string("SELECT id, name FROM book AS B WHERE id = 1;")); // Check select
+																																		 //db.shutdown();
 	system("pause");
 
 	return 0;

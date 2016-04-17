@@ -6,6 +6,11 @@
 
 #define FAST_ITERATOR_ERROR_COL -1
 
+enum RecordTableException 
+{
+	BAD_ADDR
+};
+
 template <unsigned int PAGESIZE>
 class RecordTable
 {
@@ -22,6 +27,7 @@ public:
 		~fast_iterator();
 		
 		unsigned char *next();
+		unsigned char *next(unsigned int *pAddr);
 	private:
 		RecordTable *table;
 
@@ -46,6 +52,9 @@ public:
 
 	inline unsigned int get_row_size();
 	inline const char *get_name();
+	inline int get_int(unsigned int, unsigned int col_offset);
+	inline const char *get_varchar(unsigned int, unsigned int col_offset, char *dst);
+	inline unsigned char *get_row(unsigned int);
 	inline void print_record(table_attr_desc_t **, unsigned int, const unsigned char *);
 	void save_table();
 	void save_record();
@@ -292,6 +301,39 @@ inline const char * RecordTable<PAGESIZE>::get_name()
 }
 
 template<unsigned int PAGESIZE>
+inline int RecordTable<PAGESIZE>::get_int(unsigned int addr, unsigned int col_offset)
+{
+	const DataPage<PAGESIZE> *page = mRecordFile.get_data_page(get_page_id(addr));
+	if (page == NULL)
+	{
+		throw BAD_ADDR;
+	}
+
+	int ival;
+	if (!page->read_int_at(get_page_offset(addr), col_offset, &ival))
+		throw BAD_ADDR;
+	return ival;
+}
+
+template<unsigned int PAGESIZE>
+inline const char * RecordTable<PAGESIZE>::get_varchar(unsigned int addr, unsigned int col_offset, char *dst)
+{
+	const DataPage<PAGESIZE> *page = mRecordFile.get_data_page(get_page_id(addr));
+	if (page == NULL)
+		throw BAD_ADDR;
+
+	if (!page->read_int_at(get_page_offset(addr), col_offset, &dst))
+		throw BAD_ADDR;
+	return dst;
+}
+
+template<unsigned int PAGESIZE>
+inline unsigned char * RecordTable<PAGESIZE>::get_row(unsigned int addr)
+{
+	return mRecordFile.get_record()
+}
+
+template<unsigned int PAGESIZE>
 inline void RecordTable<PAGESIZE>::print_record(table_attr_desc_t **pDesc, unsigned int descNum, const unsigned char *src)
 {
 	int int_val;
@@ -379,4 +421,12 @@ inline unsigned char * RecordTable<PAGESIZE>::fast_iterator::next()
 	} while (page_id <= table->freemap().get_max_page_id());
 
 	return NULL;
+}
+
+template<unsigned int PAGESIZE>
+inline unsigned char * RecordTable<PAGESIZE>::fast_iterator::next(unsigned int * pAddr)
+{
+	*pAddr = get_page_addr(page_id, row_id);
+
+	return next();
 }
