@@ -150,19 +150,20 @@ inline bool RecordTable<PAGESIZE>::insert(void * src)
 		unsigned int addr = mRecordFile.put_record(free_page_id, src, &result);
 		
 		/// TODO: handling error better
+#ifdef _DEBUG_INSERT
 		if (result & BIT_SUCCESS)
 		{
-#ifndef NDEBUG
+
 			printf("RecordTable::insert(): insert success.\n");
-#endif
 		}
 		else
 		{
-#ifndef NDEBUG
+
 			printf("RecordTable::insert(): insert fail.\n");
-#endif
-			success = false;
 		}
+#endif
+		if(!(result & BIT_SUCCESS))
+			success = false;
 
 		// Mark current max page as full, so that next time calling get_free_page_id we can advance page id
 		if (result & BIT_PUT_FULL)

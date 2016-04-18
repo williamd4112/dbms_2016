@@ -199,6 +199,7 @@ private:
 		unsigned char **pRecords,
 		std::stack<StmtToken>& parse_stack);
 	inline bool execute_select(std::vector<sql::Expr *>&);
+	inline void execute_select_aggregation(std::vector<sql::AggregationFunction*>&);
 	inline void execute_select_all(
 		std::vector<unsigned int> &pageAddrs,
 		std::vector<SelectEntry> &selectEntries, 
@@ -244,8 +245,14 @@ inline void QueryExecution<PAGESIZE>::execute(sql::SQLStatement * stmt)
 		}
 
 		// Select clause
-		if (select_stmt->selectList != NULL)
+		if (select_stmt->hasAggregation() && select_stmt->hasSelect())
+			throw QueryException(EXPR_SYNTAX_ERROR, "Aggregation cannot combine with column.");
+		else if (select_stmt->hasAggregation())
+			execute_select_aggregation(*select_stmt->aggregation_list);
+		else if (select_stmt->hasSelect())
 			execute_select(*select_stmt->selectList);
+		else
+			throw QueryException(EXPR_SYNTAX_ERROR, "Select nothing");
 	}
 	break;
 	default:
@@ -508,7 +515,6 @@ inline bool QueryExecution<PAGESIZE>::execute_select(std::vector<sql::Expr*>& se
 		assert(expr != NULL);
 		if (expr->type == sql::kExprStar)
 		{
-			/// TODO : To support star
 			for (int i = 0; i < mTableNum; i++)
 			{
 				for (int j = 0; j < mpTables[i]->tablefile().get_table_header().attrNum; j++)
@@ -519,13 +525,15 @@ inline bool QueryExecution<PAGESIZE>::execute_select(std::vector<sql::Expr*>& se
 				}
 			}
 		}
-		else 
+		else if (expr->type == sql::kExprColumnRef)
 		{
 			auto desc = match_col(*expr);
 			assert(desc.second < mTableNum);
 			descs.push_back(SelectEntry
 				(desc.second, desc.first, expr->getName()));
 		}
+		else
+			throw QueryException(EXPR_SYNTAX_ERROR);
 	}
 
 	for (int i = 0; i < descs.size(); i++)
@@ -549,6 +557,22 @@ inline bool QueryExecution<PAGESIZE>::execute_select(std::vector<sql::Expr*>& se
 	}
 
 	return false;
+}
+
+template<unsigned int PAGESIZE>
+inline void QueryExecution<PAGESIZE>::execute_select_aggregation(
+	std::vector<sql::AggregationFunction*>& aggreationList)
+{
+	std::vector<long long> aggregation_result(aggreationList.size(), 0);
+
+	for (sql::AggregationFunction *aggregation_col : aggreationList)
+	{
+		if (aggregation_col->type == sql::AggregationFunction::kCount)
+			printf("COUNT\t");
+		else
+			printf("SUM\n");
+		printf("%s\n",aggregation_col->attribute);
+	}
 }
 
 template<unsigned int PAGESIZE>

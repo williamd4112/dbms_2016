@@ -90,7 +90,7 @@ inline void Database<PAGESIZE>::execute(std::string &query)
 						Msg("%s insertion success.\n", PROMPT_PREFIX);
 					else
 						Msg("%s insertion failed.\n", PROMPT_PREFIX);
-					table->dump_content();
+					//table->dump_content();
 				}
 				catch (DatabaseErrorType e)
 				{
@@ -177,6 +177,9 @@ inline void Database<PAGESIZE>::exec_error_handler(QueryException & e)
 		break;
 	case SELECT_TABLE_UNDEFINED:
 		Error("%s %s table undefined.\n", PROMPT_PREFIX, e.msg.c_str());
+		break;
+	case EXPR_SYNTAX_ERROR:
+		Error("%s %s\n", PROMPT_PREFIX, e.msg.c_str());
 		break;
 	default:
 		Error("%s unhandled error: %d\n", PROMPT_PREFIX, e.type);
