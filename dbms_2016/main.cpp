@@ -1,5 +1,6 @@
 #include <iostream>
 #include <string>
+#include <ctime>
 
 #include "DataPage.h"
 #include "BitmapPageFreeMapFile.h"
@@ -60,26 +61,39 @@ void test_dbms_table_read();
 void test_dbms_table_create_duplicate();
 void test_dbms_table_iterator();
 
+/*
+	TODO: Be more careful about address space
+*/
 int main(int argc, char *argv[])
 {
 	//test_dbms_table_create();
 	//test_dbms_table_iterator();
 	//test_dbms_parser_create_table();
 	Database<PAGESIZE_8K> db("test.dbs");
+
+	clock_t begin, end;
+	double time_spent;
+
+	begin = clock();
+
 	db.execute(std::string("CREATE TABLE book (id int primary key, name varchar(20), price int);"));
 	db.execute(std::string("CREATE TABLE stu (id int primary key, name varchar(20), score int);"));
-	db.execute(std::string("INSERT INTO book VALUES (1, \'hell1\', 10);"));
-	//db.execute(std::string("INSERT INTO book VALUES (1, \'hell2\', 15);")); // check duplicate
-	db.execute(std::string("INSERT INTO book VALUES (2, \'hell2\', 20);"));
-	db.execute(std::string("INSERT INTO book VALUES (3, \'hell3\', 30);"));
-	db.execute(std::string("INSERT INTO book VALUES (3, \'hell3\', 30);"));
+	//db.execute(std::string("INSERT INTO book VALUES (1, \'hell1\', 10);"));
+	//db.execute(std::string("INSERT INTO book VALUES (2, \'hell2\', 20);"));
+	//db.execute(std::string("INSERT INTO book VALUES (3, \'hell3\', 30);"));
+	//db.execute(std::string("INSERT INTO book VALUES (3, \'hell3\', 30);"));
 
 	char buff[1024];
-	for (int i = 0; i < 10000; i++)
+	for (int i = 0; i < 100; i++)
 	{
-		sprintf(buff, "INSERT INTO book VALUES (%d, \'hell%d\', %d0);",i,i,i);
+		sprintf(buff, "INSERT INTO book VALUES (%d, \'hell%d\', %d0);",i, i, i);
 		db.execute(std::string(buff));
 	}
+
+	end = clock();
+	time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
+	printf("Time: %lf\n",time_spent);
+
 
 	//db.execute(std::string("INSERT INTO book (name, id) VALUES (\'hello\', 4);")); // Check random insertion
 	//db.execute(std::string("INSERT INTO book (price, name, id) VALUES (50, \'hello\', 5);")); // Check random insertion
@@ -96,9 +110,9 @@ int main(int argc, char *argv[])
 	//db.execute(std::string("SELECT id, name FROM book AS B, stu AS S;")); // Check select
 	//db.execute(std::string("SELECT id, name FROM book AS B WHERE book.name = 'hell2' OR id > 2;")); // Check select
 	//db.execute(std::string("SELECT stu.name AS SNAME, stu.score, book.id, book.name FROM book AS B, stu AS S WHERE book.id = stu.id;")); // Check select
-	//db.execute(std::string("SELECT id, name FROM book AS B WHERE id = 1;")); // Check select
-	/*db.execute(std::string("SELECT count(id) FROM book;"));*/
-																																		 //db.shutdown();
+	db.execute(std::string("SELECT * FROM book AS B;")); // Check select
+	db.execute(std::string("SELECT count(book.id) FROM book, stu;"));
+	//db.shutdown();																														 //db.shutdown();
 	system("pause");
 
 	return 0;
@@ -196,7 +210,7 @@ void test_recordfile_write()
 	rf.open("test.dat", "wb+");
 	for (int i = 0; i < 10; i++)
 	{
-		unsigned int addr = rf.put_record(0, str, &result);
+		unsigned int addr = rf.put_record(0, str, &result, PAGEBUFFER_WRITE);
 		if (result & BIT_SUCCESS)
 			printf("Put ok:\nPage ID: %d\nPage Offset: %d\n", get_page_id(addr), get_page_offset(addr));
 		else
@@ -216,7 +230,7 @@ void test_recordfile_write_struct_record()
 	rf.open("test.dat", "wb+");
 	for (int i = 0; i < 10; i++)
 	{
-		unsigned int addr = rf.put_record(0, &record, &result);
+		unsigned int addr = rf.put_record(0, &record, &result, PAGEBUFFER_WRITE);
 		if (result & BIT_SUCCESS)
 			printf("Put ok:\tPage ID: %d\tPage Offset: %d\n", get_page_id(addr), get_page_offset(addr));
 		else

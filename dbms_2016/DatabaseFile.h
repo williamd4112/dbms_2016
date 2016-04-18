@@ -94,7 +94,8 @@ inline bool DatabaseFile<PAGESIZE>::create_table(const char *tablename, std::vec
 	{
 		fprintf(stderr, "DatabaseFile::create_table(): duplicated table, %s\n", tablename);
 	}
-	rt->create(tablename, col_defs);
+	else
+		rt->create(tablename, col_defs);
 	return result.second;
 }
 

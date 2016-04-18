@@ -194,7 +194,8 @@ inline bool DataPage<PAGESIZE>::read_varchar_at(int row_id, size_t row_offset, v
 template<size_t PAGESIZE>
 inline unsigned char * DataPage<PAGESIZE>::get_data_row(unsigned int row_id) const
 {
-	assert(row_id >= 0 && row_id < *mpRowCount);
+	assert(row_id >= 0);
+	assert(row_id < *mpRowCount);
 	if (isUsed(row_id))
 		return get_row_addr(row_id);
 	else

@@ -84,6 +84,15 @@
     <ClCompile Include="QueryExecution.cpp">
       <Filter>原始程式檔</Filter>
     </ClCompile>
+    <ClCompile Include="ChainHashIndex.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="BinaryObject.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="database_util.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="FileUtil.h">
@@ -174,6 +183,15 @@
       <Filter>標頭檔</Filter>
     </ClInclude>
     <ClInclude Include="QueryExecution.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="ChainHashIndex.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="BinaryObject.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="database_util.h">
       <Filter>標頭檔</Filter>
     </ClInclude>
   </ItemGroup>

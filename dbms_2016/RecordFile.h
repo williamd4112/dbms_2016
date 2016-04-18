@@ -22,6 +22,7 @@
 
 #define PAGEBUFFER_WRITE 0x1
 #define PAGEBUFFER_READ 0x2
+#define PAGEBUFFER_CREATE 0x4
 
 #define get_page_id(addr) (get_val_uint32((addr), BIT_LOW_PAGEID, 31))
 #define get_page_offset(addr) (get_val_uint32((addr), 0, BIT_HIGH_PAGEOFFSET))
@@ -44,7 +45,7 @@
 
 */
 template <size_t PAGESIZE, 
-	unsigned int BUFFER_NUM_ROW = 32, unsigned int BUFFER_NUM_COL = 1, unsigned int BUFFER_SLOT_NUM = BUFFER_NUM_ROW * BUFFER_NUM_COL>
+	unsigned int BUFFER_NUM_ROW = 128, unsigned int BUFFER_NUM_COL = 1, unsigned int BUFFER_SLOT_NUM = BUFFER_NUM_ROW * BUFFER_NUM_COL>
 class RecordFile
 	: public DiskFile
 {
@@ -90,14 +91,14 @@ public:
 		unsigned char mBufferSlotInfo[BUFFER_SLOT_NUM];
 		unsigned int mBufferPageID[BUFFER_SLOT_NUM];
 
-		inline void load(unsigned int, unsigned int);
+		inline void load(unsigned int, unsigned int, unsigned char);
 	};
 
 	RecordFile(size_t rowsize);
 	RecordFile();
 	~RecordFile();
 	
-	inline unsigned int put_record(unsigned int ,void *, unsigned char *);
+	inline unsigned int put_record(unsigned int ,void *, unsigned char *, unsigned char);
 	inline bool get_record(unsigned int, void *);
 	inline unsigned char *get_record(unsigned int);
 	inline DataPage<PAGESIZE> *get_data_page(unsigned int);
@@ -150,10 +151,13 @@ inline RecordFile<PAGESIZE, BUFFER_NUM_ROW, BUFFER_NUM_COL, BUFFER_SLOT_NUM>::
 */
 template<size_t PAGESIZE, unsigned int BUFFER_NUM_ROW, unsigned int BUFFER_NUM_COL, unsigned int BUFFER_SLOT_NUM>
 inline unsigned int RecordFile<PAGESIZE, BUFFER_NUM_ROW, BUFFER_NUM_COL, BUFFER_SLOT_NUM>::
-put_record(unsigned int page_id, void *src, unsigned char *result)
+put_record(unsigned int page_id, void *src, unsigned char *result, unsigned char mode)
 {
+	assert(mode & PAGEBUFFER_WRITE);
+	assert(!(mode & PAGEBUFFER_READ));
+
 	// Get page from cache
-	DataPage<PAGESIZE> *page = get_page(page_id, PAGEBUFFER_WRITE);
+	DataPage<PAGESIZE> *page = get_page(page_id, mode);
 	
 	assert(page != NULL);
 	assert(result != NULL);
@@ -311,10 +315,12 @@ PageBuffer::get(unsigned int page_id, unsigned char mode)
 	// Cache miss 
 	// 1. Page ID inconsistent
 	// 2. Page not using
+	// 3. Page write (need to consistent with disk, so bring in)
 	if ((mBufferPageID[buffer_id] != page_id || 
-		!(mBufferSlotInfo[buffer_id] & BIT_USING)))
+		!(mBufferSlotInfo[buffer_id] & BIT_USING)) ||
+		mode == PAGEBUFFER_WRITE)
 	{
-		load(buffer_id, page_id);
+		load(buffer_id, page_id, mode);
 	}
 	
 	// Make the buffer dirty
@@ -339,7 +345,7 @@ PageBuffer::flush()
 
 template<size_t PAGESIZE, unsigned int BUFFER_NUM_ROW, unsigned int BUFFER_NUM_COL, unsigned int BUFFER_SLOT_NUM>
 inline void RecordFile<PAGESIZE, BUFFER_NUM_ROW, BUFFER_NUM_COL, BUFFER_SLOT_NUM>::
-PageBuffer::load(unsigned int buffer_id, unsigned int page_id)
+PageBuffer::load(unsigned int buffer_id, unsigned int page_id, unsigned char mode)
 {
 	// Check if need flush
 	if (is_dirty(buffer_id))
@@ -351,7 +357,11 @@ PageBuffer::load(unsigned int buffer_id, unsigned int page_id)
 	mBufferSlotInfo[buffer_id] |= BIT_USING;
 	mBufferPageID[buffer_id] = page_id;
 
-	// Bring page in
-	// NOTE: assume rowsize not change
-	mPages[buffer_id].read_at(*mpFile, file_offset(page_id));
+	// Only load from disk when create bit is on
+	if (!(mode & PAGEBUFFER_CREATE))
+	{
+		// Bring page in
+		// NOTE: assume rowsize not change
+		mPages[buffer_id].read_at(*mpFile, file_offset(page_id));
+	}
 }

@@ -1,8 +1,10 @@
 #pragma once
 
+#include "system.h"
 #include "DatabaseFile.h"
 #include "SQLParser.h"
 #include "FileUtil.h"
+#include "database_util.h"
 #include "QueryExecution.h"
 #include <unordered_map>
 #include <stack>
@@ -20,8 +22,7 @@ template <unsigned int PAGESIZE>
 class Database
 {
 public:
-#define Error printf
-#define Msg printf
+
 #define ClearBuffer() memset(mExtractionBuffer, 0, ROW_SIZE_MAX)
 
 	Database(const char *);
@@ -35,6 +36,7 @@ private:
 	
 	void error_handler(DatabaseErrorType);
 	void exec_error_handler(QueryException &e);
+	void db_errro_handler(db::DatabaseUtilException &e);
 	bool extract_values(sql::InsertStatement*, RecordTable<PAGESIZE> *);
 	bool extract_value(const sql::Expr *, const table_attr_desc_t*);
 };
@@ -77,6 +79,10 @@ inline void Database<PAGESIZE>::execute(std::string &query)
 				{
 					exec_error_handler(e);
 				}
+				catch (db::DatabaseUtilException e)
+				{
+					db_errro_handler(e);
+				}
 				break;
 			}
 			case sql::kStmtInsert:
@@ -86,6 +92,7 @@ inline void Database<PAGESIZE>::execute(std::string &query)
 					sql::InsertStatement* in_st = (sql::InsertStatement*)stmt;
 					RecordTable<PAGESIZE> *table = mDatabaseFile.get_table(in_st->tableName);
 					extract_values(in_st, table);
+
 					if (table->insert(mExtractionBuffer))
 						Msg("%s insertion success.\n", PROMPT_PREFIX);
 					else
@@ -122,7 +129,7 @@ inline void Database<PAGESIZE>::execute(std::string &query)
 	}
 	else
 	{
-		Error("%s Execution error, syntax error.\n", PROMPT_PREFIX);
+		Error("%s Parsing error: %s\n", PROMPT_PREFIX, parser->errorMsg);
 	}
 }
 
@@ -183,6 +190,20 @@ inline void Database<PAGESIZE>::exec_error_handler(QueryException & e)
 		break;
 	default:
 		Error("%s unhandled error: %d\n", PROMPT_PREFIX, e.type);
+		break;
+	}
+}
+
+template<unsigned int PAGESIZE>
+inline void Database<PAGESIZE>::db_errro_handler(db::DatabaseUtilException & e)
+{
+	switch (e)
+	{
+	case db::TYPE_CAST_ERROR:
+		Error("%s Type casting error when parsing record.\n", PROMPT_PREFIX);
+		break;
+	default:
+		Error("%s unhandled error type: %d\n", PROMPT_PREFIX, e);
 		break;
 	}
 }

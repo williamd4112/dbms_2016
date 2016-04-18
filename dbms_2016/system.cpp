@@ -4,6 +4,12 @@
 #include <cstdio>
 #include "system.h"
 
+#ifdef _QUIET
+bool quiet = true;
+#else
+bool quiet = false;
+#endif
+
 void fatal_error()
 {
 	// TODO: write a proper exception handling routine for this

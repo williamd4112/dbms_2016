@@ -145,9 +145,13 @@ inline bool RecordTable<PAGESIZE>::insert(void * src)
 		unsigned int free_page_id = mFreemapFile.get_free_page();
 		
 		unsigned char result;
+		unsigned char mode = PAGEBUFFER_WRITE;
+		
+		if (!mFreemapFile.is_present(free_page_id))
+			mode |= PAGEBUFFER_CREATE;
 
 		// TODO: make use the addr in index
-		unsigned int addr = mRecordFile.put_record(free_page_id, src, &result);
+		unsigned int addr = mRecordFile.put_record(free_page_id, src, &result, mode);
 		
 		/// TODO: handling error better
 #ifdef _DEBUG_INSERT
@@ -164,6 +168,8 @@ inline bool RecordTable<PAGESIZE>::insert(void * src)
 #endif
 		if(!(result & BIT_SUCCESS))
 			success = false;
+
+		mFreemapFile.set_page_present(free_page_id);
 
 		// Mark current max page as full, so that next time calling get_free_page_id we can advance page id
 		if (result & BIT_PUT_FULL)
@@ -404,12 +410,20 @@ inline RecordTable<PAGESIZE>::fast_iterator::~fast_iterator()
 template<unsigned int PAGESIZE>
 inline unsigned char * RecordTable<PAGESIZE>::fast_iterator::next()
 {
+	unsigned int dummy;
+	return next(&dummy);
+}
+
+template<unsigned int PAGESIZE>
+inline unsigned char * RecordTable<PAGESIZE>::fast_iterator::next(unsigned int * pAddr)
+{
 	do
 	{
 		assert(cur_page != NULL);
 
-		if(row_id < cur_page->get_row_count())
+		if (row_id < cur_page->get_row_count())
 		{
+			*pAddr = get_page_addr(page_id, row_id);
 			return cur_page->get_data_row(row_id++);
 		}
 		else
@@ -422,12 +436,4 @@ inline unsigned char * RecordTable<PAGESIZE>::fast_iterator::next()
 	} while (page_id <= table->freemap().get_max_page_id());
 
 	return NULL;
-}
-
-template<unsigned int PAGESIZE>
-inline unsigned char * RecordTable<PAGESIZE>::fast_iterator::next(unsigned int * pAddr)
-{
-	*pAddr = get_page_addr(page_id, row_id);
-
-	return next();
 }

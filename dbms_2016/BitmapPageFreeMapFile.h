@@ -39,6 +39,7 @@ public:
 	{
 		unsigned int mCurMaxPage;
 		Bitmap<MAXNUMPAGE> mBitmap;
+		Bitmap<MAXNUMPAGE> mPresentMap;
 
 		DiskPart();
 		~DiskPart();
@@ -48,8 +49,10 @@ public:
 	~BitmapPageFreeMapFile();
 
 	inline unsigned int get_free_page();
+	inline unsigned bool is_present(unsigned int);
 	inline unsigned int get_max_page_id();
 	inline void set_page_full(unsigned int);
+	inline void set_page_present(unsigned int);
 	inline void dump_info();
 
 	inline void write_back();
@@ -90,6 +93,7 @@ inline unsigned int BitmapPageFreeMapFile<PAGESIZE, FILESIZE, MAXNUMPAGE>::get_f
 		if (!mDiskPart.mBitmap.Test(maxPageIndex))
 		{
 			mDiskPart.mCurMaxPage = maxPageIndex;
+
 			return maxPageIndex;
 		}
 		else
@@ -111,6 +115,12 @@ inline unsigned int BitmapPageFreeMapFile<PAGESIZE, FILESIZE, MAXNUMPAGE>::get_f
 }
 
 template<size_t PAGESIZE, size_t FILESIZE, unsigned int MAXNUMPAGE>
+inline unsigned bool BitmapPageFreeMapFile<PAGESIZE, FILESIZE, MAXNUMPAGE>::is_present(unsigned int page_id)
+{
+	return mDiskPart.mPresentMap.Test(page_id);
+}
+
+template<size_t PAGESIZE, size_t FILESIZE, unsigned int MAXNUMPAGE>
 inline unsigned int BitmapPageFreeMapFile<PAGESIZE, FILESIZE, MAXNUMPAGE>::get_max_page_id()
 {
 	return mDiskPart.mCurMaxPage;
@@ -126,6 +136,12 @@ inline void BitmapPageFreeMapFile<PAGESIZE, FILESIZE, MAXNUMPAGE>::set_page_full
 {
 	assert(pid >= 0 && pid < MAXNUMPAGE);
 	mDiskPart.mBitmap.Set(pid);
+}
+
+template<size_t PAGESIZE, size_t FILESIZE, unsigned int MAXNUMPAGE>
+inline void BitmapPageFreeMapFile<PAGESIZE, FILESIZE, MAXNUMPAGE>::set_page_present(unsigned int page_id)
+{
+	mDiskPart.mPresentMap.Set(page_id);
 }
 
 
