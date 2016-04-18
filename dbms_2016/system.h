@@ -1,6 +1,6 @@
 #pragma once
 
-#define Error printf
+#define Error(fmt, ...) printf(fmt, __VA_ARGS__)
 #define Msg if(!quiet) printf
 #define Warning printf
 

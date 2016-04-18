@@ -19,6 +19,9 @@
 #define ATTR_TYPE_INTEGER 0x1
 #define ATTR_TYPE_VARCHAR 0x2
 
+// Star type for QueryExecution aggregation
+#define ATTR_TYPE_STAR 0x4 
+
 #define ATTR_CONSTRAINT_NO 0x0
 #define ATTR_CONSTRAINT_PRIMARY_KEY 0x1
 
@@ -71,8 +74,8 @@ public:
 	~TableFile();
 
 	const table_header_t& get_table_header() const;
-	table_attr_desc_t *get_attr_desc(const char *);
-	table_attr_desc_t *get_attr_desc(unsigned int);
+	table_attr_desc_t *get_attr_desc(const char *) const;
+	table_attr_desc_t *get_attr_desc(unsigned int) const;
 	const table_attr_desc_t *get_attr_descs();
 	const bool get_attr_descs(const char **, unsigned int, table_attr_desc_t **);
 	

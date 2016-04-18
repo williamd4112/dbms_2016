@@ -27,12 +27,12 @@ void db::print_record(const table_attr_desc_t * pDesc, const unsigned char * pRe
 	{
 	case ATTR_TYPE_INTEGER:
 		memcpy(&ival, pRecord + pDesc->offset, pDesc->size);
-		printf("%d", ival);
+		printf("%-*d", 11, ival);
 		break;
 	case ATTR_TYPE_VARCHAR:
 		memcpy(sval, pRecord + pDesc->offset, pDesc->size);
 		if (sval[0] == '\0') printf("NULL");
-		else printf("%s", sval);
+		else printf("%-*s",pDesc->size, sval);
 		break;
 	case ATTR_TYPE_UNDEFINED:
 		printf("NULL");

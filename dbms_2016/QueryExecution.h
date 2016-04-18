@@ -17,8 +17,10 @@ enum QueryExceptionType
 	FROM_DUPLICATE_ALIAS,
 	
 	WHERE_COLUMN_AMBIGUOUS,
+	WHERE_COLUMN_UNDEFINED,
 	WHERE_TABLEREF_ERROR,
 	WHERE_RANGE_UNDEFINED,
+	WHERE_TYPE_MISMATCH,
 
 	SELECT_COLUMN_AMBIGUOUS,
 	SELECT_COLUMN_UNDEFINED,
@@ -26,7 +28,6 @@ enum QueryExceptionType
 	SELECT_RANGE_UNDEFINED,
 
 	NO_FROM_CLAUSE,
-	TYPE_MISMATCH,
 	EXPR_SYNTAX_ERROR,
 	UNDEFINED_EXPR,
 	UNDEFINED_TOKEN_TYPE,
@@ -42,6 +43,9 @@ struct QueryException
 	QueryException(QueryExceptionType _type);
 	~QueryException();
 };
+
+/// TODO: modify the design, make sure this variable is const
+static table_attr_desc_t kStarAttr{"Star", ATTR_TYPE_STAR, 0, 0, 0};
 
 template <unsigned int PAGESIZE>
 class QueryExecution
@@ -131,7 +135,7 @@ private:
 		friend bool operator ==(StmtToken &t1, StmtToken &t2) 
 		{
 			if (t1.type != t2.type)
-				throw QueryException(TYPE_MISMATCH);
+				throw QueryException(WHERE_TYPE_MISMATCH);
 			switch (t1.type)
 			{
 			case TOKEN_INT:
@@ -151,14 +155,14 @@ private:
 		friend bool operator <(StmtToken &t1, StmtToken &t2)
 		{
 			if(t1.type != TOKEN_INT || t2.type != TOKEN_INT)
-				throw QueryException(TYPE_MISMATCH);
+				throw QueryException(WHERE_TYPE_MISMATCH);
 			return t1.get_int() < t2.get_int();
 		}
 
 		friend bool operator >(StmtToken &t1, StmtToken &t2)
 		{
 			if (t1.type != TOKEN_INT || t2.type != TOKEN_INT)
-				throw QueryException(TYPE_MISMATCH);
+				throw QueryException(WHERE_TYPE_MISMATCH);
 			return t1.get_int() > t2.get_int();
 		}
 
@@ -259,7 +263,8 @@ private:
 	inline const char *gen_select_column_name(
 		char *buff, 
 		const char *table, 
-		const char *col, 
+		const char *col,
+		const char *alias,
 		SelectEntryType type);
 
 	inline void print_select_entries(
@@ -354,6 +359,7 @@ inline void QueryExecution<PAGESIZE>::execute_where(sql::Expr * where_clause)
 	// Allocate table record 's pointer
 	std::vector<unsigned int> addrs;
 	addrs.resize(mTableNum);
+	pRecords.resize(mTableNum, nullptr);
 
 	execute_where_traverse_table(where_clause, addrs, mTableNum - 1);
 }
@@ -442,6 +448,8 @@ inline bool QueryExecution<PAGESIZE>::parse_coldef(
 		if (result != mTableMap.end())
 		{
 			pAttrDesc = pTable->tablefile().get_attr_desc(expr->name);
+			if (pAttrDesc == NULL) 
+				throw QueryException(WHERE_COLUMN_UNDEFINED, expr->name);
 			parse_token(pAttrDesc, pRecords[tid]);
 		}
 	}
@@ -484,7 +492,7 @@ inline bool QueryExecution<PAGESIZE>::parse_operator(
 	StmtToken &t1 = mParseStack.top(); mParseStack.pop();
 
 	if (t1.type != t2.type)
-		throw QueryException(TYPE_MISMATCH);
+		throw QueryException(WHERE_TYPE_MISMATCH);
 
 	bool result = false;
 	switch (expr->op_type)
@@ -536,6 +544,7 @@ inline void QueryExecution<PAGESIZE>::execute_select_list(
 		for (int i = 0; i < mFilteredRecordAddrs.size(); i += mTableNum)
 		{
 			print_select_column_with_entries(mFilteredRecordAddrs, i);
+			putchar('\n');
 		}
 		break;
 	case RANGE_FROM:
@@ -643,7 +652,6 @@ inline void QueryExecution<PAGESIZE>::print_select_column_with_entries(
 
 		table_attr_desc_t *desc = std::get<1>(mSelectEntries[i]);
 		db::print_record(desc, record);
-		printf("\t");
 	}
 }
 
@@ -687,6 +695,8 @@ inline void QueryExecution<PAGESIZE>::execute_select_aggregate_entries(
 			mAggregationCounter[i]++;
 			break;
 		case SUM:
+			if(desc->type == ATTR_TYPE_STAR) 
+				throw QueryException(EXPR_SYNTAX_ERROR, "SUM(*) is invalid.");
 			mAggregationCounter[i] += db::parse_int(record, *desc);
 			break;
 		default:
@@ -725,9 +735,10 @@ inline std::pair<table_attr_desc_t*, unsigned int> QueryExecution<PAGESIZE>::mat
 		int ref_cnt = 0;
 		for (unsigned int i = 0; i < mTableNum; i++)
 		{
-			desc = mpTables[tid]->tablefile().get_attr_desc(name);
-			if (desc != NULL)
+			table_attr_desc_t *tmp = mpTables[i]->tablefile().get_attr_desc(name);
+			if (tmp != NULL)
 			{
+				desc = tmp;
 				tid = i;
 				ref_cnt++;
 				if (ref_cnt > 1)
@@ -746,18 +757,36 @@ inline void QueryExecution<PAGESIZE>::parse_select_entry(
 	sql::Expr & expr,
 	SelectEntryType type)
 {
+	static char view_name[ATTR_NAME_MAX * 3];
+
+	// Pre-checking (due to parser-end code is not strong)
+	/// TODO: notify parser-end dev
+	if (!expr.hasTable())
+		expr.table = nullptr;
+
 	if (expr.type == sql::kExprStar)
 	{
+		// Special case: Star
+		if (type != COLUMN)
+		{
+			// A little trick: since SUM(*) is invalid, so only COUNT(*) can be possible
+			mSelectEntries.push_back(SelectEntry
+				(0, &kStarAttr, "COUNT(*)", type));
+			return;
+		}
+
 		for (int i = 0; i < mTableNum; i++)
 		{
-			for (int j = 0; j < mpTables[i]->tablefile().get_table_header().attrNum; j++)
+			const TableFile &tablefile = mpTables[i]->tablefile();
+			for (int j = 0; j < tablefile.get_table_header().attrNum; j++)
 			{
 				assert(mpTables[i] != NULL);
-				
-				table_attr_desc_t *desc = mpTables[i]->tablefile().get_attr_desc(j);
+
+				table_attr_desc_t *desc = tablefile.get_attr_desc(j);
 				mSelectEntries.push_back(SelectEntry
-					(i, desc, desc->name, type));
+					(i, desc, gen_select_column_name(view_name, mpTables[i]->get_name(), desc->name, NULL, type), type));
 			}
+
 		}
 	}
 	else if (expr.type == sql::kExprColumnRef)
@@ -766,7 +795,7 @@ inline void QueryExecution<PAGESIZE>::parse_select_entry(
 		assert(desc.second < mTableNum);
 
 		mSelectEntries.push_back(SelectEntry
-			(desc.second, desc.first, expr.getName(), type));
+			(desc.second, desc.first, gen_select_column_name(view_name, expr.table, expr.name, expr.alias, type), type));
 	}
 	else
 		throw QueryException(EXPR_SYNTAX_ERROR);
@@ -777,6 +806,8 @@ inline void QueryExecution<PAGESIZE>::parse_token(
 	const table_attr_desc_t * pAttrDesc, 
 	unsigned char * pRecord)
 {
+	assert(pAttrDesc != NULL);
+
 	if (pAttrDesc->type == ATTR_TYPE_INTEGER)
 	{
 		mParseStack.push(StmtToken(db::parse_int(pRecord, *pAttrDesc)));
@@ -797,6 +828,7 @@ inline const char * QueryExecution<PAGESIZE>::gen_select_column_name(
 	char * buff, 
 	const char * table, 
 	const char * col, 
+	const char * alias,
 	SelectEntryType type)
 {
 	assert(buff != NULL);
@@ -804,15 +836,18 @@ inline const char * QueryExecution<PAGESIZE>::gen_select_column_name(
 	switch (type)
 	{
 	case COLUMN:
-		if (table != NULL) sprintf(buff, "%s.%s", table, col);
+		if(alias != NULL) sprintf(buff, "%s",alias);
+		else if (table != NULL) sprintf(buff, "%s.%s", table, col);
 		else sprintf(buff, "%s", col);
 		break;
 	case COUNT:
-		if (table != NULL) sprintf(buff, "COUNT(%s.%s)", table, col);
+		if (alias != NULL) sprintf(buff, "%s", alias);
+		else if (table != NULL) sprintf(buff, "COUNT(%s.%s)", table, col);
 		else sprintf(buff, "COUNT(%s)", col);
 		break;
 	case SUM:
-		if (table != NULL) sprintf(buff, "SUM(%s.%s)", table, col);
+		if (alias != NULL) sprintf(buff, "%s", alias);
+		else if (table != NULL) sprintf(buff, "SUM(%s.%s)", table, col);
 		else sprintf(buff, "SUM(%s)", col);
 		break;
 	default:
@@ -824,9 +859,16 @@ inline const char * QueryExecution<PAGESIZE>::gen_select_column_name(
 template<unsigned int PAGESIZE>
 inline void QueryExecution<PAGESIZE>::print_select_entries(std::vector<SelectEntry> &selectEntries)
 {
+	unsigned int width_sum = 0;
 	for (int i = 0; i < selectEntries.size(); i++)
 	{
-		printf("%s\t", std::get<2>(selectEntries[i]).c_str());
+		const table_attr_desc_t *desc = std::get<1>(selectEntries[i]);
+		assert(desc != NULL);
+
+		const int width = (std::get<3>(selectEntries[i]) == SelectEntryType::COLUMN) ? 
+			((desc->type == ATTR_TYPE_INTEGER) ? 11 : desc->size) : 20;
+		printf("%-*s", width, std::get<2>(selectEntries[i]).c_str());
+		width_sum += width;
 	}
 	putchar('\n');
 }
@@ -836,7 +878,7 @@ inline void QueryExecution<PAGESIZE>::print_aggregation_counter()
 {
 	for (int i = 0; i < mAggregationCounter.size(); i++)
 	{
-		printf("%lld\t", mAggregationCounter[i]);
+		printf("%-*lld",20, mAggregationCounter[i]);
 	}
 	putchar('\n');
 }

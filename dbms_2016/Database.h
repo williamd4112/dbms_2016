@@ -9,12 +9,13 @@
 #include <unordered_map>
 #include <stack>
 
-static const char *PROMPT_PREFIX = "Database$: ";
+#define PROMPT_PREFIX "Database$: "
 
 enum DatabaseErrorType
 {
 	DUPLICATE_TABLE,
 	INSERT_COLUMN_NOT_FOUND,
+	INSERT_COLUMN_SIZE_EXECEED,
 	UNDEFINED_TABLE,
 	SYNTAX_ERROR
 };
@@ -60,7 +61,7 @@ inline Database<PAGESIZE>::~Database()
 template<unsigned int PAGESIZE>
 inline void Database<PAGESIZE>::execute(std::string &query)
 {
-	Msg("%s execute: %s\n", PROMPT_PREFIX, query.c_str());
+	printf("%s execute: %s\n", PROMPT_PREFIX, query.c_str());
 	sql::SQLParserResult *parser = sql::SQLParser::parseSQLString(query);
 
 	if (parser->isValid)
@@ -97,10 +98,11 @@ inline void Database<PAGESIZE>::execute(std::string &query)
 					extract_values(in_st, table);
 
 					if (table->insert(mExtractionBuffer))
+					{
 						Msg("%s insertion success.\n", PROMPT_PREFIX);
+					}
 					else
-						Msg("%s insertion failed.\n", PROMPT_PREFIX);
-					//table->dump_content();
+						Error("%s insertion failed: %s.\n", PROMPT_PREFIX, table->get_error_msg());
 				}
 				catch (DatabaseErrorType e)
 				{
@@ -115,8 +117,6 @@ inline void Database<PAGESIZE>::execute(std::string &query)
 				if (result)
 				{
 					Msg("%s table %s creation successful.\n", PROMPT_PREFIX, cr_st->tableName);
-					RecordTable<PAGESIZE> *table = mDatabaseFile.get_table(cr_st->tableName);
-					table->dump_info();
 				}
 				else
 				{
@@ -153,6 +153,9 @@ inline void Database<PAGESIZE>::error_handler(DatabaseErrorType e)
 	case INSERT_COLUMN_NOT_FOUND:
 		Error("%s Insertion error, column not found.\n", PROMPT_PREFIX);
 		break;
+	case INSERT_COLUMN_SIZE_EXECEED:
+		Error("%s Insertion error, column too large.\n", PROMPT_PREFIX);
+		break;
 	case UNDEFINED_TABLE:
 		Error("%s Insertion error, table not found.\n", PROMPT_PREFIX);
 		break;
@@ -179,8 +182,14 @@ inline void Database<PAGESIZE>::exec_error_handler(QueryException & e)
 	case WHERE_COLUMN_AMBIGUOUS:
 		Error("%s %s ambiguous column.\n", PROMPT_PREFIX, e.msg.c_str());
 		break;
+	case WHERE_COLUMN_UNDEFINED:
+		Error("%s %s undefined column.\n", PROMPT_PREFIX, e.msg.c_str());
+		break;
 	case WHERE_TABLEREF_ERROR:
 		Error("%s %s table ref error.\n", PROMPT_PREFIX, e.msg.c_str());
+		break;
+	case WHERE_TYPE_MISMATCH:
+		Error("%s type mismatched.\n", PROMPT_PREFIX, e.msg.c_str());
 		break;
 	case SELECT_COLUMN_AMBIGUOUS:
 		Error("%s %s ambiguous column.\n", PROMPT_PREFIX, e.msg.c_str());
@@ -260,7 +269,11 @@ inline bool Database<PAGESIZE>::extract_value(const sql::Expr *expr, const table
 	if (expr->type == sql::kExprLiteralInt)
 		memcpy(mExtractionBuffer + pDesc->offset, &expr->ival, pDesc->size);
 	else if (expr->type == sql::kExprLiteralString)
+	{
+		if (strlen(expr->name) >= pDesc->size) // Since we need to consider terminate character, so use <=
+			throw INSERT_COLUMN_SIZE_EXECEED;
 		memcpy(mExtractionBuffer + pDesc->offset, expr->name, strlen(expr->name));
+	}
 	else
 	{
 		Error("%s Insertion statement error: syntax error\n", PROMPT_PREFIX);

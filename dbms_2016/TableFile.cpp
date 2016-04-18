@@ -25,9 +25,9 @@ const table_header_t &TableFile::get_table_header() const
 	return mHeader;
 }
 
-table_attr_desc_t *TableFile::get_attr_desc(const char *attrName)
+table_attr_desc_t *TableFile::get_attr_desc(const char *attrName) const
 {
-	AttrDictionary::iterator it = mAttrHashIndex.find(attrName);
+	AttrDictionary::const_iterator it = mAttrHashIndex.find(attrName);
 	if (it != mAttrHashIndex.end())
 	{
 		return it->second;
@@ -35,7 +35,7 @@ table_attr_desc_t *TableFile::get_attr_desc(const char *attrName)
 	return nullptr;
 }
 
-table_attr_desc_t *TableFile::get_attr_desc(unsigned int index)
+table_attr_desc_t *TableFile::get_attr_desc(unsigned int index) const
 {	
 	if (index >= 0 && index < mHeader.attrNum)
 		return &mAttrDescs[index];
@@ -136,6 +136,9 @@ void TableFile::init(const char *name, std::vector<sql::ColumnDefinition*>& col_
 		mAttrDescs[i].size = col_defs[i]->length;
 		mAttrDescs[i].type = (col_defs[i]->type == sql::ColumnDefinition::INT) ? ATTR_TYPE_INTEGER : ATTR_TYPE_VARCHAR;
 		mAttrDescs[i].constraint = col_defs[i]->IsPK ? ATTR_CONSTRAINT_PRIMARY_KEY : 0x0;
+
+		if (mAttrDescs[i].type == ATTR_TYPE_VARCHAR)
+			mAttrDescs[i].size++;
 
 		if (mAttrDescs[i].constraint & ATTR_CONSTRAINT_PRIMARY_KEY)
 		{

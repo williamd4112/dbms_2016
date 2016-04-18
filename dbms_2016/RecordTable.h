@@ -3,12 +3,15 @@
 #include "RecordFile.h"
 #include "BitmapPageFreeMapFile.h"
 #include "TableFile.h"
+#include "system.h"
 
 #define FAST_ITERATOR_ERROR_COL -1
 
 enum RecordTableException 
 {
-	BAD_ADDR
+	NO_EXCEPTION,
+	BAD_ADDR,
+	DUPLICATED_RECORD
 };
 
 template <unsigned int PAGESIZE>
@@ -52,13 +55,18 @@ public:
 
 	inline unsigned int get_row_size();
 	inline const char *get_name();
+	inline RecordTableException get_error();
 	inline int get_int(unsigned int, unsigned int col_offset);
 	inline const char *get_varchar(unsigned int, unsigned int col_offset, char *dst);
 	inline unsigned char *get_row(unsigned int);
 	inline void print_record(table_attr_desc_t **, unsigned int, const unsigned char *);
+	
 	void save_table();
 	void save_record();
 	void save_freemap();
+
+	static const char *get_error_msg(RecordTableException e);
+	const char *get_error_msg();
 
 	void dump_info();
 	void dump_content();
@@ -66,6 +74,9 @@ private:
 	TableFile mTableFile;
 	RecordFile<PAGESIZE> mRecordFile;
 	BitmapPageFreeMapFile<PAGESIZE> mFreemapFile;
+
+	/* Record last error exception, access only by get_error()*/
+	RecordTableException mError;
 
 	inline void open_all(const char *, const char *);
 	inline bool check_duplicated(const void *src);
@@ -135,7 +146,7 @@ inline bool RecordTable<PAGESIZE>::insert(void * src)
 {
 	if (check_duplicated(src))
 	{
-		printf("RecordTable::insert(): insert failed, duplicate record\n");
+		mError = DUPLICATED_RECORD;
 		return false;
 	}
 
@@ -179,7 +190,7 @@ inline bool RecordTable<PAGESIZE>::insert(void * src)
 	}
 	catch (int e)
 	{
-		fprintf(stderr, "RecordTable::insert(): no enough space.\n");
+		Error("RecordTable::insert(): no enough space.\n");
 		success = false;
 	}
 	return success;
@@ -252,6 +263,27 @@ inline void RecordTable<PAGESIZE>::save_freemap()
 }
 
 template<unsigned int PAGESIZE>
+inline const char *RecordTable<PAGESIZE>::get_error_msg(RecordTableException e)
+{
+	switch (e)
+	{
+	case BAD_ADDR:
+		return "Bad adddress";
+	case DUPLICATED_RECORD:
+		return "Duplicated record";
+	default:
+		return "No error";
+		break;
+	}
+}
+
+template<unsigned int PAGESIZE>
+inline const char * RecordTable<PAGESIZE>::get_error_msg()
+{
+	return get_error_msg(get_error());
+}
+
+template<unsigned int PAGESIZE>
 inline void RecordTable<PAGESIZE>::dump_info()
 {
 	mTableFile.dump_info();
@@ -305,6 +337,14 @@ template<unsigned int PAGESIZE>
 inline const char * RecordTable<PAGESIZE>::get_name()
 {
 	return mTableFile.get_table_header().name;
+}
+
+template<unsigned int PAGESIZE>
+inline RecordTableException RecordTable<PAGESIZE>::get_error()
+{
+	RecordTableException e = mError;
+	mError = NO_EXCEPTION;
+	return e;
 }
 
 template<unsigned int PAGESIZE>
