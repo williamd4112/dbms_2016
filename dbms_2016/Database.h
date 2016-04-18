@@ -15,6 +15,7 @@ enum DatabaseErrorType
 {
 	DUPLICATE_TABLE,
 	INSERT_COLUMN_NOT_FOUND,
+	UNDEFINED_TABLE,
 	SYNTAX_ERROR
 };
 
@@ -91,6 +92,8 @@ inline void Database<PAGESIZE>::execute(std::string &query)
 				{
 					sql::InsertStatement* in_st = (sql::InsertStatement*)stmt;
 					RecordTable<PAGESIZE> *table = mDatabaseFile.get_table(in_st->tableName);
+					if (table == NULL)
+						throw UNDEFINED_TABLE;
 					extract_values(in_st, table);
 
 					if (table->insert(mExtractionBuffer))
@@ -149,6 +152,9 @@ inline void Database<PAGESIZE>::error_handler(DatabaseErrorType e)
 		break;
 	case INSERT_COLUMN_NOT_FOUND:
 		Error("%s Insertion error, column not found.\n", PROMPT_PREFIX);
+		break;
+	case UNDEFINED_TABLE:
+		Error("%s Insertion error, table not found.\n", PROMPT_PREFIX);
 		break;
 	default:
 		Error("%s Unhandled error, error code: %d\n", PROMPT_PREFIX, e);

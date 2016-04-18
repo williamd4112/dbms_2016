@@ -2,6 +2,7 @@
 
 #include <cstdlib>
 #include <cstdio>
+#include <ctime>
 #include "system.h"
 
 #ifdef _QUIET
@@ -20,4 +21,16 @@ void fatal_error()
 void sub_error(const char *msg)
 {
 	printf("Warning: %s\n", msg);
+}
+
+void profile_pefromance(Routine routine)
+{
+	clock_t begin, end;
+	double time_spent;
+
+	begin = clock();
+	routine();
+	end = clock();
+	time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
+	printf("Time elapsed: %lf\n", time_spent);
 }

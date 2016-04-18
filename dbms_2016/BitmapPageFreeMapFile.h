@@ -49,7 +49,7 @@ public:
 	~BitmapPageFreeMapFile();
 
 	inline unsigned int get_free_page();
-	inline unsigned bool is_present(unsigned int);
+	inline bool is_present(unsigned int);
 	inline unsigned int get_max_page_id();
 	inline void set_page_full(unsigned int);
 	inline void set_page_present(unsigned int);
@@ -115,7 +115,7 @@ inline unsigned int BitmapPageFreeMapFile<PAGESIZE, FILESIZE, MAXNUMPAGE>::get_f
 }
 
 template<size_t PAGESIZE, size_t FILESIZE, unsigned int MAXNUMPAGE>
-inline unsigned bool BitmapPageFreeMapFile<PAGESIZE, FILESIZE, MAXNUMPAGE>::is_present(unsigned int page_id)
+inline bool BitmapPageFreeMapFile<PAGESIZE, FILESIZE, MAXNUMPAGE>::is_present(unsigned int page_id)
 {
 	return mDiskPart.mPresentMap.Test(page_id);
 }

@@ -10,3 +10,34 @@ int db::parse_int(unsigned char * const record, const table_attr_desc_t &desc)
 
 	return *(reinterpret_cast<int*>(&record[desc.offset]));
 }
+
+char * db::parse_varchar(unsigned char * const record, const table_attr_desc_t & desc)
+{
+	if (desc.type != ATTR_TYPE_VARCHAR)
+		throw TYPE_CAST_ERROR;
+
+	return (reinterpret_cast<char*>(&record[desc.offset]));
+}
+
+void db::print_record(const table_attr_desc_t * pDesc, const unsigned char * pRecord)
+{
+	int ival;
+	char sval[ATTR_SIZE_MAX];
+	switch (pDesc->type)
+	{
+	case ATTR_TYPE_INTEGER:
+		memcpy(&ival, pRecord + pDesc->offset, pDesc->size);
+		printf("%d", ival);
+		break;
+	case ATTR_TYPE_VARCHAR:
+		memcpy(sval, pRecord + pDesc->offset, pDesc->size);
+		if (sval[0] == '\0') printf("NULL");
+		else printf("%s", sval);
+		break;
+	case ATTR_TYPE_UNDEFINED:
+		printf("NULL");
+		break;
+	default:
+		throw UNRESOLVED_ATTR_TYPE;
+	}
+}

@@ -18,17 +18,18 @@ enum QueryExceptionType
 	
 	WHERE_COLUMN_AMBIGUOUS,
 	WHERE_TABLEREF_ERROR,
+	WHERE_RANGE_UNDEFINED,
 
 	SELECT_COLUMN_AMBIGUOUS,
 	SELECT_COLUMN_UNDEFINED,
 	SELECT_TABLE_UNDEFINED,
+	SELECT_RANGE_UNDEFINED,
 
 	NO_FROM_CLAUSE,
 	TYPE_MISMATCH,
 	EXPR_SYNTAX_ERROR,
 	UNDEFINED_EXPR,
 	UNDEFINED_TOKEN_TYPE,
-	UNDEFINED_ATTR_TYPE,
 	ACCESS_VIOLATION
 };
 
@@ -172,7 +173,7 @@ private:
 	/* Number of table selected */
 	unsigned int mTableNum;
 
-	/* Range selection */
+	/* Range qualifier */
 	unsigned char mRange;
 
 	/* Table reference */
@@ -181,73 +182,94 @@ private:
 	/* Table Pointers pool*/
 	std::vector<Table *> mpTables;
 
-	/* Final output address set */
+	/* Record Pointer buffer */
+	std::vector<unsigned char *> pRecords;
+
+	/* Parsing stack for statment */
+	std::stack<StmtToken> mParseStack;
+
+	/* Filtered address set */
 	std::vector<unsigned int> mFilteredRecordAddrs;
 	
+	/* Select Entries (specify what column be selected) */
+	std::vector<SelectEntry> mSelectEntries;
+
 	/* Aggregation counter */
 	std::vector<long long> mAggregationCounter;
 
 	inline void execute_from(std::vector<sql::TableRef*> *from_clause);
 	inline void execute_where(sql::Expr *where_clause);
+
 	inline void execute_where_traverse_table(
 		sql::Expr *where_clause,
-		unsigned char **pRecords,
 		std::vector<unsigned int> &addrs,
 		unsigned int depth);
-	inline bool execute_where_eval(
-		sql::Expr *where_clause,
-		unsigned char **pRecords);
-	inline bool execute_where_parse_expr(
-		sql::Expr *expr,
-		unsigned char **pRecords,
-		std::stack<StmtToken>& parse_stack);
-	inline bool execute_where_parse_coldef(
-		sql::Expr *expr,
-		unsigned char **pRecords,
-		std::stack<StmtToken>& parse_stack);
-	inline bool execute_where_parse_operator(
-		sql::Expr *expr,
-		unsigned char **pRecords,
-		std::stack<StmtToken>& parse_stack);
-	inline bool execute_select(std::vector<sql::Expr *>&);
-	inline void execute_select_aggregation(std::vector<sql::AggregationFunction*>&);
 
-	inline void execute_parse_select_entries(
-		std::vector<sql::Expr*>& select_clause,
-		std::vector<SelectEntry>& selectEntries);
+	inline void execute_select_list(
+		std::vector<sql::Expr *>&);
 
-	inline void execute_parse_select_entries(
-		std::vector<sql::AggregationFunction*> aggregation_list,
-		std::vector<SelectEntry>& selectEntries);
+	inline void execute_aggregation_list(
+		std::vector<sql::AggregationFunction*>&);
 
-	inline void execute_select_all(
+	inline void parse_select_list(
+		std::vector<sql::Expr*>& select_list);
+
+	inline void parse_aggregation_list(
+		std::vector<sql::AggregationFunction*> aggregation_list);
+
+	inline void execute_select_print_all(
 		std::vector<unsigned int> &pageAddrs,
-		std::vector<SelectEntry> &selectEntries, 
 		unsigned int depth);
-
-	inline void execute_select_print_entries(
-		std::vector<SelectEntry> &selectEntries, 
-		std::vector<unsigned int> pageAddrs,
-		unsigned int baseoffset);
 
 	inline void execute_select_aggregate_all(
 		std::vector<unsigned int> &pageAddrs,
-		std::vector<SelectEntry> &selectEntries,
 		unsigned int depth);
 
 	inline void execute_select_aggregate_entries(
-		std::vector<SelectEntry> &selectEntries,
 		std::vector<unsigned int> pageAddrs,
 		unsigned int baseoffset);
 
-	inline std::pair<table_attr_desc_t *, unsigned int> match_col(sql::Expr& expr);
-	inline std::pair<table_attr_desc_t *, unsigned int> match_col(const char *table, const char *name);
-	inline void extract_token(const table_attr_desc_t *pAttrDesc, unsigned char *pRecord, std::stack<StmtToken> &parse_stack);
-	inline int extract_int(unsigned char *pRecord, unsigned int offset);
-	inline char *extract_varchar(unsigned char *pRecord, unsigned int offset);
-	inline void print_record(const table_attr_desc_t *pDesc, const unsigned char *pRecord);
+	inline std::pair<table_attr_desc_t *, unsigned int> match_col(
+		const sql::Expr& expr);
 
-	inline const char *gen_select_column_name(char *buff, const char *table, const char *col, SelectEntryType type);
+	inline std::pair<table_attr_desc_t *, unsigned int> match_col(
+		const char *table, 
+		const char *name);
+
+	inline void parse_select_entry(
+		sql::Expr &expr,
+		SelectEntryType type);
+
+	inline bool parse_eval(
+		sql::Expr *where_clause);
+
+	inline bool parse_expr(
+		sql::Expr *expr);
+
+	inline void parse_token(
+		const table_attr_desc_t *pAttrDesc, 
+		unsigned char *pRecord);
+
+	inline bool parse_coldef(
+		sql::Expr *expr);
+
+	inline bool parse_operator(
+		sql::Expr *expr);
+
+	inline const char *gen_select_column_name(
+		char *buff, 
+		const char *table, 
+		const char *col, 
+		SelectEntryType type);
+
+	inline void print_select_entries(
+		std::vector<SelectEntry> &selectEntries);
+
+	inline void print_aggregation_counter();
+
+	inline void print_select_column_with_entries(
+		std::vector<unsigned int> pageAddrs,
+		unsigned int baseoffset);
 };
 
 template<unsigned int PAGESIZE>
@@ -283,9 +305,9 @@ inline void QueryExecution<PAGESIZE>::execute(sql::SQLStatement * stmt)
 		if (select_stmt->hasAggregation() && select_stmt->hasSelect())
 			throw QueryException(EXPR_SYNTAX_ERROR, "Aggregation cannot combine with column.");
 		else if (select_stmt->hasAggregation())
-			execute_select_aggregation(*select_stmt->aggregation_list);
+			execute_aggregation_list(*select_stmt->aggregation_list);
 		else if (select_stmt->hasSelect())
-			execute_select(*select_stmt->selectList);
+			execute_select_list(*select_stmt->selectList);
 		else
 			throw QueryException(EXPR_SYNTAX_ERROR, "Select nothing");
 	}
@@ -321,58 +343,24 @@ inline void QueryExecution<PAGESIZE>::execute_from(std::vector<sql::TableRef*>* 
 				throw QueryException(FROM_DUPLICATE_ALIAS, ref->alias);
 		}
 	}
-
-#ifdef _DEBUG_SELECT
-	for (TableMap::iterator it = mTableMap.begin(); it != mTableMap.end(); it++)
-	{
-		printf("%s -> {%s\t%d}\n",it->first.c_str(), mpTables[it->second]->get_name(), it->second);
-	}
-#endif
 }
 
 template<unsigned int PAGESIZE>
 inline void QueryExecution<PAGESIZE>::execute_where(sql::Expr * where_clause)
 {
 	if (mTableNum <= 0)
-		throw QueryException(NO_FROM_CLAUSE);
-
+		throw QueryException(WHERE_RANGE_UNDEFINED);
 
 	// Allocate table record 's pointer
-	unsigned char **pRecords = new unsigned char*[mTableNum];
-	
 	std::vector<unsigned int> addrs;
 	addrs.resize(mTableNum);
 
-	execute_where_traverse_table(where_clause, pRecords, addrs, mTableNum - 1);
-	delete [] pRecords;
-
-#ifdef _DEBUG_SELECT
-	for (int i = 0; i < mRecordAddrs.size(); i += mTableNum)
-	{
-		printf("{");
-		for (int j = 0; j < mTableNum; j++)
-		{
-			printf("(");
-			const table_attr_desc_t *pDescs = mpTables[j]->tablefile().get_attr_descs();
-			for (int k = 0; k < mpTables[j]->tablefile().get_table_header().attrNum; k++)
-			{
-				if (k != 0) putchar('\t');
-				const unsigned char *record = mpTables[j]->records().get_record(mRecordAddrs[i + j]);
-				if (record == NULL)
-					throw ACCESS_VIOLATION;
-				print_record(&pDescs[k], record);
-			}
-			printf(")");
-		}
-		printf("}\n");
-	}
-#endif
+	execute_where_traverse_table(where_clause, addrs, mTableNum - 1);
 }
 
 template<unsigned int PAGESIZE>
 inline void QueryExecution<PAGESIZE>::execute_where_traverse_table(
 	sql::Expr * where_clause,
-	unsigned char ** pRecords,
 	std::vector<unsigned int> &addrs,
 	unsigned int depth)
 {
@@ -384,7 +372,7 @@ inline void QueryExecution<PAGESIZE>::execute_where_traverse_table(
 		if (depth == 0)
 		{
 			// Invoke where-checking
-			bool b = execute_where_eval(where_clause, pRecords);
+			bool b = parse_eval(where_clause);
 			if (b)
 			{
 				for (int i = 0; i < addrs.size(); i++)
@@ -393,40 +381,38 @@ inline void QueryExecution<PAGESIZE>::execute_where_traverse_table(
 		}
 		else
 		{
-			execute_where_traverse_table(where_clause, pRecords, addrs, depth - 1);
+			execute_where_traverse_table(where_clause, addrs, depth - 1);
 		}
 	}
 }
 
 template<unsigned int PAGESIZE>
-inline bool QueryExecution<PAGESIZE>::execute_where_eval(
-	sql::Expr * where_clause, 
-	unsigned char ** pRecords)
+inline bool QueryExecution<PAGESIZE>::parse_eval(
+	sql::Expr * where_clause)
 {
-	std::stack<StmtToken> st;
-	return execute_where_parse_expr(where_clause, pRecords, st);
+	while (!mParseStack.empty())
+		mParseStack.pop();
+	return parse_expr(where_clause);
 }
 
 template<unsigned int PAGESIZE>
-inline bool QueryExecution<PAGESIZE>::execute_where_parse_expr(
-	sql::Expr * expr, 
-	unsigned char ** pRecords,
-	std::stack<StmtToken>& parse_stack)
+inline bool QueryExecution<PAGESIZE>::parse_expr(
+	sql::Expr * expr)
 {
 	bool result = false;
 	switch (expr->type)
 	{
 	case sql::kExprLiteralInt:
-		parse_stack.push(StmtToken((int)expr->ival));
+		mParseStack.push(StmtToken((int)expr->ival));
 		break;
 	case sql::kExprLiteralString:
-		parse_stack.push(StmtToken(expr->name));
+		mParseStack.push(StmtToken(expr->name));
 		break;
 	case sql::kExprColumnRef:
-		execute_where_parse_coldef(expr, pRecords, parse_stack);
+		parse_coldef(expr);
 		break;
 	case sql::kExprOperator:
-		result = execute_where_parse_operator(expr, pRecords, parse_stack);
+		result = parse_operator(expr);
 		break;
 	default:
 		throw QueryException(UNDEFINED_EXPR);
@@ -435,10 +421,8 @@ inline bool QueryExecution<PAGESIZE>::execute_where_parse_expr(
 }
 
 template<unsigned int PAGESIZE>
-inline bool QueryExecution<PAGESIZE>::execute_where_parse_coldef(
-	sql::Expr * expr, 
-	unsigned char ** pRecords, 
-	std::stack<StmtToken>& parse_stack)
+inline bool QueryExecution<PAGESIZE>::parse_coldef(
+	sql::Expr * expr)
 {
 	/// TODO: Caching to spped up
 	// Table 0 's record in pRecords[0]
@@ -458,7 +442,7 @@ inline bool QueryExecution<PAGESIZE>::execute_where_parse_coldef(
 		if (result != mTableMap.end())
 		{
 			pAttrDesc = pTable->tablefile().get_attr_desc(expr->name);
-			extract_token(pAttrDesc, pRecords[tid], parse_stack);
+			parse_token(pAttrDesc, pRecords[tid]);
 		}
 	}
 	else
@@ -476,7 +460,7 @@ inline bool QueryExecution<PAGESIZE>::execute_where_parse_coldef(
 			{
 				if (ref_cnt > 0)
 					throw QueryException(WHERE_COLUMN_AMBIGUOUS, expr->name);
-				extract_token(pAttrDesc, pRecords[i], parse_stack);
+				parse_token(pAttrDesc, pRecords[i]);
 				ref_cnt++;
 			}
 		}
@@ -487,19 +471,17 @@ inline bool QueryExecution<PAGESIZE>::execute_where_parse_coldef(
 }
 
 template<unsigned int PAGESIZE>
-inline bool QueryExecution<PAGESIZE>::execute_where_parse_operator(
-	sql::Expr *expr, 
-	unsigned char ** pRecords,
-	std::stack<StmtToken>& parse_stack)
+inline bool QueryExecution<PAGESIZE>::parse_operator(
+	sql::Expr *expr)
 {
-	execute_where_parse_expr(expr->expr, pRecords, parse_stack);
-	execute_where_parse_expr(expr->expr2, pRecords, parse_stack);
+	parse_expr(expr->expr);
+	parse_expr(expr->expr2);
 
-	if (parse_stack.size() < 2)
+	if (mParseStack.size() < 2)
 		throw QueryException(EXPR_SYNTAX_ERROR);
 
-	StmtToken &t2 = parse_stack.top(); parse_stack.pop();
-	StmtToken &t1 = parse_stack.top(); parse_stack.pop();
+	StmtToken &t2 = mParseStack.top(); mParseStack.pop();
+	StmtToken &t1 = mParseStack.top(); mParseStack.pop();
 
 	if (t1.type != t2.type)
 		throw QueryException(TYPE_MISMATCH);
@@ -537,157 +519,98 @@ inline bool QueryExecution<PAGESIZE>::execute_where_parse_operator(
 	default:
 		throw QueryException(EXPR_SYNTAX_ERROR);
 	}
-	parse_stack.push(StmtToken(result));
+	mParseStack.push(StmtToken(result));
 	return result;
 }
 
 template<unsigned int PAGESIZE>
-inline bool QueryExecution<PAGESIZE>::execute_select(std::vector<sql::Expr*>& select_clause)
+inline void QueryExecution<PAGESIZE>::execute_select_list(
+	std::vector<sql::Expr*>& select_list)
 {
-	std::vector<SelectEntry> descs;
-	execute_parse_select_entries(select_clause, descs);
+	parse_select_list(select_list);
+	print_select_entries(mSelectEntries);
 
-	for (int i = 0; i < descs.size(); i++)
+	switch (mRange)
 	{
-		printf("%s\t", std::get<2>(descs[i]).c_str());
-	}
-	putchar('\n');
-
-	if (mRange & RANGE_WHERE)
-	{
+	case RANGE_WHERE:
 		for (int i = 0; i < mFilteredRecordAddrs.size(); i += mTableNum)
 		{
-			execute_select_print_entries(descs, mFilteredRecordAddrs, i);
-			printf("\n");
+			print_select_column_with_entries(mFilteredRecordAddrs, i);
 		}
-	}
-	else
+		break;
+	case RANGE_FROM:
 	{
 		std::vector<unsigned int> addrs(mTableNum, 0);
-		execute_select_all(addrs, descs, mTableNum - 1);
+		execute_select_print_all(addrs, mTableNum - 1);
 	}
-
-	return false;
+	break;
+	default:
+		throw QueryException(SELECT_RANGE_UNDEFINED, " requires WHERE or FROM.");
+	}
 }
 
 template<unsigned int PAGESIZE>
-inline void QueryExecution<PAGESIZE>::execute_select_aggregation(
+inline void QueryExecution<PAGESIZE>::execute_aggregation_list(
 	std::vector<sql::AggregationFunction*>& aggreationList)
 {
-	mAggregationCounter.resize(aggreationList.size(), 0);
-
-	std::vector<SelectEntry> selectEntries;
-	selectEntries.reserve(aggreationList.size());
-
-	execute_parse_select_entries(aggreationList, selectEntries);
+	parse_aggregation_list(aggreationList);
+	mAggregationCounter.resize(mSelectEntries.size(), 0);
 	
-	if (mRange & RANGE_WHERE)
+	switch (mRange)
 	{
+	case RANGE_WHERE:
 		for (int i = 0; i < mFilteredRecordAddrs.size(); i += mTableNum)
 		{
-			execute_select_aggregate_entries(selectEntries, mFilteredRecordAddrs, i);
+			execute_select_aggregate_entries(mFilteredRecordAddrs, i);
 		}
-	}
-	else
-	{
-		std::vector<unsigned int> addrs(mTableNum, 0);
-		execute_select_aggregate_all(addrs, selectEntries, mTableNum - 1);
+		break;
+	case RANGE_FROM:
+		{
+			std::vector<unsigned int> addrs(mTableNum, 0);
+			execute_select_aggregate_all(addrs, mTableNum - 1);
+		}
+		break;
+	default:
+		throw QueryException(SELECT_RANGE_UNDEFINED, " requires WHERE or FROM.");
 	}
 
-	for (int i = 0; i < selectEntries.size(); i++)
-	{
-		printf("%s\t", std::get<2>(selectEntries[i]).c_str());
-	}
-	putchar('\n');
-
-	for (int i = 0; i < mAggregationCounter.size(); i++)
-	{
-		printf("%lld\t", mAggregationCounter[i]);
-	}
-	putchar('\n');
+	print_select_entries(mSelectEntries);
+	print_aggregation_counter();
 }
 
 template<unsigned int PAGESIZE>
-inline void QueryExecution<PAGESIZE>::execute_parse_select_entries(
-	std::vector<sql::Expr*>& select_clause,
-	std::vector<SelectEntry>& selectEntries)
+inline void QueryExecution<PAGESIZE>::parse_select_list(
+	std::vector<sql::Expr*>& select_list)
 {
-	for (sql::Expr *expr : select_clause)
+	for (sql::Expr *expr : select_list)
 	{
-		assert(expr != NULL);
-		if (expr->type == sql::kExprStar)
-		{
-			for (int i = 0; i < mTableNum; i++)
-			{
-				for (int j = 0; j < mpTables[i]->tablefile().get_table_header().attrNum; j++)
-				{
-					assert(mpTables[i] != NULL);
+		parse_select_entry(*expr, COLUMN);
+	}
+}
 
-					table_attr_desc_t *desc = mpTables[i]->tablefile().get_attr_desc(j);
-					selectEntries.push_back(SelectEntry
-						(i, desc, desc->name, COLUMN));
-				}
-			}
-		}
-		else if (expr->type == sql::kExprColumnRef)
+template<unsigned int PAGESIZE>
+inline void QueryExecution<PAGESIZE>::parse_aggregation_list(
+	std::vector<sql::AggregationFunction*> aggregation_list)
+{
+	for (sql::AggregationFunction *aggregation : aggregation_list)
+	{
+		switch (aggregation->type)
 		{
-			auto desc = match_col(*expr);
-			assert(desc.second < mTableNum);
-
-			selectEntries.push_back(SelectEntry
-				(desc.second, desc.first, expr->getName(), COLUMN));
-		}
-		else
+		case sql::AggregationFunction::kCount:
+			parse_select_entry(*(aggregation->attribute), COUNT);
+			break;
+		case sql::AggregationFunction::kSum:
+			parse_select_entry(*(aggregation->attribute), SUM);
+			break;
+		default:
 			throw QueryException(EXPR_SYNTAX_ERROR);
-	}
-}
-
-template<unsigned int PAGESIZE>
-inline void QueryExecution<PAGESIZE>::execute_parse_select_entries(
-	std::vector<sql::AggregationFunction*> aggregation_list, 
-	std::vector<SelectEntry>& selectEntries)
-{
-	for (sql::AggregationFunction *col : aggregation_list)
-	{
-		assert(col != NULL);
-		if (col->attribute == NULL)
-			throw QueryException(EXPR_SYNTAX_ERROR, " Aggregation function require a column reference.");
-
-		if (strcmp(col->attribute, "*") == 0)
-		{
-			/// TODO: Wait for * aggregation fixing
-			//for (int i = 0; i < mTableNum; i++)
-			//{
-			//	for (int j = 0; j < mpTables[i]->tablefile().get_table_header().attrNum; j++)
-			//	{
-			//		assert(mpTables[i] != NULL);
-
-			//		table_attr_desc_t *desc = mpTables[i]->tablefile().get_attr_desc(j);
-			//		selectEntries.push_back(SelectEntry
-			//			(i, desc, desc->name, COLUMN));
-			//	}
-			//}
-		}
-		else
-		{
-			if (!col->hasTableName()) col->tableName = NULL;
-
-			auto desc = match_col(col->tableName, col->attribute);
-			assert(desc.second < mTableNum);
-
-			SelectEntryType type = (col->type == sql::AggregationFunction::kCount) ? COUNT : SUM;
-
-			char rName[ATTR_NAME_MAX * 2 + 4];
-			selectEntries.push_back(SelectEntry
-				(desc.second, desc.first, gen_select_column_name(rName, col->tableName, col->attribute, type), type));
 		}
 	}
 }
 
 template<unsigned int PAGESIZE>
-inline void QueryExecution<PAGESIZE>::execute_select_all(
-	std::vector<unsigned int>& pageAddrs, 
-	std::vector<SelectEntry>& selectEntries,
+inline void QueryExecution<PAGESIZE>::execute_select_print_all(
+	std::vector<unsigned int>& pageAddrs,
 	unsigned int depth)
 {
 	unsigned int page_addr;
@@ -697,30 +620,29 @@ inline void QueryExecution<PAGESIZE>::execute_select_all(
 		pageAddrs[depth] = page_addr;
 		if (depth == 0)
 		{
-			execute_select_print_entries(selectEntries, pageAddrs, 0);
+			print_select_column_with_entries(pageAddrs, 0);
 			printf("\n");
 		}
 		else
 		{
-			execute_select_all(pageAddrs, selectEntries, depth - 1);
+			execute_select_print_all(pageAddrs, depth - 1);
 		}
 	}
 }
 
 template<unsigned int PAGESIZE>
-inline void QueryExecution<PAGESIZE>::execute_select_print_entries(
-	std::vector<SelectEntry>& selectEntries,
+inline void QueryExecution<PAGESIZE>::print_select_column_with_entries(
 	std::vector<unsigned int> pageAddrs,
 	unsigned int baseoffset)
 {
-	for (unsigned int i = 0; i < selectEntries.size(); i++)
+	for (unsigned int i = 0; i < mSelectEntries.size(); i++)
 	{
-		unsigned int tid = std::get<0>(selectEntries[i]);
+		unsigned int tid = std::get<0>(mSelectEntries[i]);
 		unsigned int addr = pageAddrs[baseoffset + tid];
 		unsigned char *record = mpTables[tid]->records().get_record(addr);
 
-		table_attr_desc_t *desc = std::get<1>(selectEntries[i]);
-		print_record(desc, record);
+		table_attr_desc_t *desc = std::get<1>(mSelectEntries[i]);
+		db::print_record(desc, record);
 		printf("\t");
 	}
 }
@@ -728,7 +650,6 @@ inline void QueryExecution<PAGESIZE>::execute_select_print_entries(
 template<unsigned int PAGESIZE>
 inline void QueryExecution<PAGESIZE>::execute_select_aggregate_all(
 	std::vector<unsigned int>& pageAddrs, 
-	std::vector<SelectEntry>& selectEntries,
 	unsigned int depth)
 {
 	unsigned int page_addr;
@@ -738,29 +659,28 @@ inline void QueryExecution<PAGESIZE>::execute_select_aggregate_all(
 		pageAddrs[depth] = page_addr;
 		if (depth == 0)
 		{
-			execute_select_aggregate_entries(selectEntries, pageAddrs, 0);
+			execute_select_aggregate_entries(pageAddrs, 0);
 		}
 		else
 		{
-			execute_select_aggregate_all(pageAddrs, selectEntries, depth - 1);
+			execute_select_aggregate_all(pageAddrs, depth - 1);
 		}
 	}
 }
 
 template<unsigned int PAGESIZE>
 inline void QueryExecution<PAGESIZE>::execute_select_aggregate_entries(
-	std::vector<SelectEntry>& selectEntries, 
 	std::vector<unsigned int> pageAddrs, 
 	unsigned int baseoffset)
 {
-	for (unsigned int i = 0; i < selectEntries.size(); i++)
+	for (unsigned int i = 0; i < mSelectEntries.size(); i++)
 	{
-		unsigned int tid = std::get<0>(selectEntries[i]);
+		unsigned int tid = std::get<0>(mSelectEntries[i]);
 		unsigned int addr = pageAddrs[baseoffset + tid];
 		unsigned char *record = mpTables[tid]->records().get_record(addr);
-		table_attr_desc_t *desc = std::get<1>(selectEntries[i]);
+		table_attr_desc_t *desc = std::get<1>(mSelectEntries[i]);
 
-		SelectEntryType type = std::get<3>(selectEntries[i]);
+		SelectEntryType type = std::get<3>(mSelectEntries[i]);
 		switch (type)
 		{
 		case COUNT:
@@ -777,7 +697,7 @@ inline void QueryExecution<PAGESIZE>::execute_select_aggregate_entries(
 }
 
 template<unsigned int PAGESIZE>
-inline std::pair<table_attr_desc_t *, unsigned int> QueryExecution<PAGESIZE>::match_col(sql::Expr & expr)
+inline std::pair<table_attr_desc_t *, unsigned int> QueryExecution<PAGESIZE>::match_col(const sql::Expr & expr)
 {
 	return match_col(expr.table, expr.name);
 }
@@ -822,59 +742,53 @@ inline std::pair<table_attr_desc_t*, unsigned int> QueryExecution<PAGESIZE>::mat
 }
 
 template<unsigned int PAGESIZE>
-inline void QueryExecution<PAGESIZE>::extract_token(
+inline void QueryExecution<PAGESIZE>::parse_select_entry(
+	sql::Expr & expr,
+	SelectEntryType type)
+{
+	if (expr.type == sql::kExprStar)
+	{
+		for (int i = 0; i < mTableNum; i++)
+		{
+			for (int j = 0; j < mpTables[i]->tablefile().get_table_header().attrNum; j++)
+			{
+				assert(mpTables[i] != NULL);
+				
+				table_attr_desc_t *desc = mpTables[i]->tablefile().get_attr_desc(j);
+				mSelectEntries.push_back(SelectEntry
+					(i, desc, desc->name, type));
+			}
+		}
+	}
+	else if (expr.type == sql::kExprColumnRef)
+	{
+		auto desc = match_col(expr);
+		assert(desc.second < mTableNum);
+
+		mSelectEntries.push_back(SelectEntry
+			(desc.second, desc.first, expr.getName(), type));
+	}
+	else
+		throw QueryException(EXPR_SYNTAX_ERROR);
+}
+
+template<unsigned int PAGESIZE>
+inline void QueryExecution<PAGESIZE>::parse_token(
 	const table_attr_desc_t * pAttrDesc, 
-	unsigned char * pRecord, 
-	std::stack<StmtToken>& parse_stack)
+	unsigned char * pRecord)
 {
 	if (pAttrDesc->type == ATTR_TYPE_INTEGER)
 	{
-		parse_stack.push(StmtToken(extract_int(pRecord, pAttrDesc->offset)));
+		mParseStack.push(StmtToken(db::parse_int(pRecord, *pAttrDesc)));
 	}
 	else if (pAttrDesc->type == ATTR_TYPE_VARCHAR)
 	{
-		parse_stack.push(StmtToken(extract_varchar(pRecord, pAttrDesc->offset)));
+		mParseStack.push(StmtToken(db::parse_varchar(pRecord, *pAttrDesc)));
 	}
 	else
 	{
-		printf("WARNING: Use NULL Type as Table schema.\n");
-		parse_stack.push(StmtToken());
-	}
-}
-
-template<unsigned int PAGESIZE>
-inline int QueryExecution<PAGESIZE>::extract_int(unsigned char * pRecord, unsigned int offset)
-{
-	return *(int*)(pRecord + offset);
-}
-
-template<unsigned int PAGESIZE>
-inline char * QueryExecution<PAGESIZE>::extract_varchar(unsigned char * pRecord, unsigned int offset)
-{
-	return (char*)pRecord + offset;
-}
-
-template<unsigned int PAGESIZE>
-inline void QueryExecution<PAGESIZE>::print_record(const table_attr_desc_t * pDesc, const unsigned char * pRecord)
-{
-	int ival;
-	char sval[ATTR_SIZE_MAX];
-	switch (pDesc->type)
-	{
-	case ATTR_TYPE_INTEGER:
-		memcpy(&ival, pRecord + pDesc->offset, pDesc->size);
-		printf("%d",ival);
-		break;
-	case ATTR_TYPE_VARCHAR:
-		memcpy(sval, pRecord + pDesc->offset, pDesc->size);
-		if (sval[0] == '\0') printf("NULL");
-		else printf("%s", sval);
-		break;
-	case ATTR_TYPE_UNDEFINED:
-		printf("NULL");
-		break;
-	default:
-		throw UNDEFINED_ATTR_TYPE;
+		Warning("WARNING: Use NULL Type as Table schema.\n");
+		mParseStack.push(StmtToken());
 	}
 }
 
@@ -905,4 +819,24 @@ inline const char * QueryExecution<PAGESIZE>::gen_select_column_name(
 		throw QueryException(EXPR_SYNTAX_ERROR);
 	}
 	return buff;
+}
+
+template<unsigned int PAGESIZE>
+inline void QueryExecution<PAGESIZE>::print_select_entries(std::vector<SelectEntry> &selectEntries)
+{
+	for (int i = 0; i < selectEntries.size(); i++)
+	{
+		printf("%s\t", std::get<2>(selectEntries[i]).c_str());
+	}
+	putchar('\n');
+}
+
+template<unsigned int PAGESIZE>
+inline void QueryExecution<PAGESIZE>::print_aggregation_counter()
+{
+	for (int i = 0; i < mAggregationCounter.size(); i++)
+	{
+		printf("%lld\t", mAggregationCounter[i]);
+	}
+	putchar('\n');
 }
