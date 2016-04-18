@@ -84,10 +84,11 @@ int main(int argc, char *argv[])
 	db.execute(std::string("INSERT INTO stu (price, name, id) VALUES (50, \'hello\', 5);")); // Check random insertion
 	db.execute(std::string("INSERT INTO stu (name) VALUES (\'hello\');")); // Check int default value
 	db.execute(std::string("INSERT INTO stu (id) VALUES (15);")); // Check varchar default value
-	db.execute(std::string("SELECT id, name FROM book AS B, stu AS S;")); // Check select
-	db.execute(std::string("SELECT id, name FROM book AS B WHERE book.name = 'hell2' OR id > 2;")); // Check select
-	db.execute(std::string("SELECT stu.name AS SNAME, stu.score, book.id, book.name FROM book AS B, stu AS S WHERE book.id = stu.id;")); // Check select
-	db.execute(std::string("SELECT id, name FROM book AS B WHERE id = 1;")); // Check select
+	//db.execute(std::string("SELECT id, name FROM book AS B, stu AS S;")); // Check select
+	//db.execute(std::string("SELECT id, name FROM book AS B WHERE book.name = 'hell2' OR id > 2;")); // Check select
+	//db.execute(std::string("SELECT stu.name AS SNAME, stu.score, book.id, book.name FROM book AS B, stu AS S WHERE book.id = stu.id;")); // Check select
+	//db.execute(std::string("SELECT id, name FROM book AS B WHERE id = 1;")); // Check select
+	db.execute(std::string("SELECT *, book.id AS BID FROM book, stu WHERE book.id = stu.id;"));
 																																		 //db.shutdown();
 	system("pause");
 

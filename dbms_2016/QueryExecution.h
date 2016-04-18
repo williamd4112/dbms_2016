@@ -44,10 +44,13 @@ struct QueryException
 template <unsigned int PAGESIZE>
 class QueryExecution
 {
+#define RANGE_FROM 0x1
+#define RANGE_WHERE 0x2
 public:
 	typedef std::pair<std::string, int> TableMapEntry;
 	typedef std::unordered_map<std::string, int> TableMap;
 	typedef RecordTable<PAGESIZE> Table;
+	typedef std::tuple<unsigned int, table_attr_desc_t *, std::string> SelectEntry;
 
 	QueryExecution(DatabaseFile<PAGESIZE> &dbf);
 	~QueryExecution();
@@ -161,6 +164,9 @@ private:
 	/* Number of table selected */
 	unsigned int mTableNum;
 
+	/* Range selection */
+	unsigned char mRange;
+
 	/* Table reference */
 	TableMap mTableMap;
 
@@ -168,7 +174,7 @@ private:
 	std::vector<Table *> mpTables;
 
 	/* Final output address set */
-	std::vector<unsigned int> mRecordAddrs;
+	std::vector<unsigned int> mFilteredRecordAddrs;
 
 	inline void execute_from(std::vector<sql::TableRef*> *from_clause);
 	inline void execute_where(sql::Expr *where_clause);
@@ -193,6 +199,14 @@ private:
 		unsigned char **pRecords,
 		std::stack<StmtToken>& parse_stack);
 	inline bool execute_select(std::vector<sql::Expr *>&);
+	inline void execute_select_all(
+		std::vector<unsigned int> &pageAddrs,
+		std::vector<SelectEntry> &selectEntries, 
+		unsigned int depth);
+	inline void execute_select_print_entries(
+		std::vector<SelectEntry> &selectEntries, 
+		std::vector<unsigned int> pageAddrs,
+		unsigned int baseoffset);
 	inline std::pair<table_attr_desc_t *, unsigned int> match_col(sql::Expr& expr);
 	inline void extract_token(const table_attr_desc_t *pAttrDesc, unsigned char *pRecord, std::stack<StmtToken> &parse_stack);
 	inline int extract_int(unsigned char *pRecord, unsigned int offset);
@@ -202,7 +216,7 @@ private:
 
 template<unsigned int PAGESIZE>
 inline QueryExecution<PAGESIZE>::QueryExecution(DatabaseFile<PAGESIZE> &dbf)
-	: mDbf(dbf)
+	: mDbf(dbf), mRange(RANGE_FROM)
 {
 }
 
@@ -223,8 +237,11 @@ inline void QueryExecution<PAGESIZE>::execute(sql::SQLStatement * stmt)
 		execute_from(select_stmt->fromTable);
 
 		// Where clause
-		if(select_stmt->whereClause != NULL)
+		if (select_stmt->whereClause != NULL)
+		{
 			execute_where(select_stmt->whereClause);
+			mRange = RANGE_WHERE;
+		}
 
 		// Select clause
 		if (select_stmt->selectList != NULL)
@@ -329,7 +346,7 @@ inline void QueryExecution<PAGESIZE>::execute_where_traverse_table(
 			if (b)
 			{
 				for (int i = 0; i < addrs.size(); i++)
-					mRecordAddrs.push_back(addrs[i]);
+					mFilteredRecordAddrs.push_back(addrs[i]);
 			}
 		}
 		else
@@ -485,19 +502,28 @@ inline bool QueryExecution<PAGESIZE>::execute_where_parse_operator(
 template<unsigned int PAGESIZE>
 inline bool QueryExecution<PAGESIZE>::execute_select(std::vector<sql::Expr*>& select_clause)
 {
-	std::vector<std::tuple<unsigned int, table_attr_desc_t *, std::string>> descs;
+	std::vector<SelectEntry> descs;
 	for (sql::Expr *expr : select_clause)
 	{
 		assert(expr != NULL);
 		if (expr->type == sql::kExprStar)
 		{
 			/// TODO : To support star
+			for (int i = 0; i < mTableNum; i++)
+			{
+				for (int j = 0; j < mpTables[i]->tablefile().get_table_header().attrNum; j++)
+				{
+					table_attr_desc_t *desc = mpTables[i]->tablefile().get_attr_desc(j);
+					descs.push_back(SelectEntry
+						(i, desc, desc->name));
+				}
+			}
 		}
 		else 
 		{
 			auto desc = match_col(*expr);
 			assert(desc.second < mTableNum);
-			descs.push_back(std::tuple<unsigned int, table_attr_desc_t *, std::string>
+			descs.push_back(SelectEntry
 				(desc.second, desc.first, expr->getName()));
 		}
 	}
@@ -508,21 +534,62 @@ inline bool QueryExecution<PAGESIZE>::execute_select(std::vector<sql::Expr*>& se
 	}
 	putchar('\n');
 
-	for (int i = 0; i < mRecordAddrs.size(); i += mTableNum)
+	if (mRange & RANGE_WHERE)
 	{
-		for (int j = 0; j < descs.size(); j++)
+		for (int i = 0; i < mFilteredRecordAddrs.size(); i += mTableNum)
 		{
-			unsigned int tid = std::get<0>(descs[j]);
-			unsigned int addr = mRecordAddrs[i + tid];
-			unsigned char *record = mpTables[tid]->records().get_record(addr);
-			table_attr_desc_t *desc = std::get<1>(descs[j]);
-			print_record(desc, record);
-			printf("\t");
+			execute_select_print_entries(descs, mFilteredRecordAddrs, i);
+			printf("\n");
 		}
-		printf("\n");
+	}
+	else
+	{
+		std::vector<unsigned int> addrs(mTableNum, 0);
+		execute_select_all(addrs, descs, mTableNum - 1);
 	}
 
 	return false;
+}
+
+template<unsigned int PAGESIZE>
+inline void QueryExecution<PAGESIZE>::execute_select_all(
+	std::vector<unsigned int>& pageAddrs, 
+	std::vector<SelectEntry>& selectEntries,
+	unsigned int depth)
+{
+	unsigned int page_addr;
+	Table::fast_iterator it(mpTables[depth]);
+	while (it.next(&page_addr) != NULL)
+	{
+		pageAddrs[depth] = page_addr;
+		if (depth == 0)
+		{
+			execute_select_print_entries(selectEntries, pageAddrs, 0);
+			printf("\n");
+		}
+		else
+		{
+			execute_select_all(pageAddrs, selectEntries, depth - 1);
+		}
+	}
+}
+
+template<unsigned int PAGESIZE>
+inline void QueryExecution<PAGESIZE>::execute_select_print_entries(
+	std::vector<SelectEntry>& selectEntries,
+	std::vector<unsigned int> pageAddrs,
+	unsigned int baseoffset)
+{
+	for (unsigned int i = 0; i < selectEntries.size(); i++)
+	{
+		unsigned int tid = std::get<0>(selectEntries[i]);
+		unsigned int addr = pageAddrs[baseoffset + tid];
+		unsigned char *record = mpTables[tid]->records().get_record(addr);
+
+		table_attr_desc_t *desc = std::get<1>(selectEntries[i]);
+		print_record(desc, record);
+		printf("\t");
+	}
 }
 
 template<unsigned int PAGESIZE>
@@ -610,7 +677,8 @@ inline void QueryExecution<PAGESIZE>::print_record(const table_attr_desc_t * pDe
 		break;
 	case ATTR_TYPE_VARCHAR:
 		memcpy(sval, pRecord + pDesc->offset, pDesc->size);
-		printf("%s", sval);
+		if (sval[0] == '\0') printf("NULL");
+		else printf("%s", sval);
 		break;
 	case ATTR_TYPE_UNDEFINED:
 		printf("NULL");
