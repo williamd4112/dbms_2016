@@ -361,7 +361,7 @@ inline void QueryExecution<PAGESIZE>::execute_where(sql::Expr * where_clause)
 	addrs.resize(mTableNum);
 	pRecords.resize(mTableNum, nullptr);
 
-	execute_where_traverse_table(where_clause, addrs, mTableNum - 1);
+	execute_where_traverse_table(where_clause, addrs, 0);
 }
 
 template<unsigned int PAGESIZE>
@@ -375,19 +375,21 @@ inline void QueryExecution<PAGESIZE>::execute_where_traverse_table(
 	while ((pRecords[depth] = it.next(&page_addr)) != NULL)
 	{
 		addrs[depth] = page_addr;
-		if (depth == 0)
+		if (depth == addrs.size() - 1)
 		{
 			// Invoke where-checking
 			bool b = parse_eval(where_clause);
 			if (b)
 			{
 				for (int i = 0; i < addrs.size(); i++)
+				{
 					mFilteredRecordAddrs.push_back(addrs[i]);
+				}
 			}
 		}
 		else
 		{
-			execute_where_traverse_table(where_clause, addrs, depth - 1);
+			execute_where_traverse_table(where_clause, addrs, depth + 1);
 		}
 	}
 }
@@ -550,7 +552,7 @@ inline void QueryExecution<PAGESIZE>::execute_select_list(
 	case RANGE_FROM:
 	{
 		std::vector<unsigned int> addrs(mTableNum, 0);
-		execute_select_print_all(addrs, mTableNum - 1);
+		execute_select_print_all(addrs, 0);
 	}
 	break;
 	default:
@@ -576,7 +578,7 @@ inline void QueryExecution<PAGESIZE>::execute_aggregation_list(
 	case RANGE_FROM:
 		{
 			std::vector<unsigned int> addrs(mTableNum, 0);
-			execute_select_aggregate_all(addrs, mTableNum - 1);
+			execute_select_aggregate_all(addrs, 0);
 		}
 		break;
 	default:
@@ -627,14 +629,14 @@ inline void QueryExecution<PAGESIZE>::execute_select_print_all(
 	while (it.next(&page_addr) != NULL)
 	{
 		pageAddrs[depth] = page_addr;
-		if (depth == 0)
+		if (depth == pageAddrs.size() - 1)
 		{
 			print_select_column_with_entries(pageAddrs, 0);
 			printf("\n");
 		}
 		else
 		{
-			execute_select_print_all(pageAddrs, depth - 1);
+			execute_select_print_all(pageAddrs, depth + 1);
 		}
 	}
 }
@@ -665,13 +667,13 @@ inline void QueryExecution<PAGESIZE>::execute_select_aggregate_all(
 	while (it.next(&page_addr) != NULL)
 	{
 		pageAddrs[depth] = page_addr;
-		if (depth == 0)
+		if (depth == pageAddrs.size() - 1)
 		{
 			execute_select_aggregate_entries(pageAddrs, 0);
 		}
 		else
 		{
-			execute_select_aggregate_all(pageAddrs, depth - 1);
+			execute_select_aggregate_all(pageAddrs, depth + 1);
 		}
 	}
 }
@@ -777,6 +779,7 @@ inline void QueryExecution<PAGESIZE>::parse_select_entry(
 
 		for (int i = 0; i < mTableNum; i++)
 		{
+			/// TODO: If star with table name, do filtering
 			const TableFile &tablefile = mpTables[i]->tablefile();
 			for (int j = 0; j < tablefile.get_table_header().attrNum; j++)
 			{

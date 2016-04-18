@@ -37,6 +37,8 @@ static Database<PAGESIZE_8K> database("database.dbs");
 */
 int main(int argc, char *argv[])
 {
+	freopen("output.txt", "w", stdout);
+
 	if (argc >= ARGC_FILE_IMPORT) // File import
 	{
 		for (int i = ARGV_FILE_IMPORT; i < argc; i++)
@@ -46,9 +48,9 @@ int main(int argc, char *argv[])
 			parse_stream(ifs, false);
 		}
 	}
-	parse_stream(cin, true);
+	//parse_stream(cin, true);
 
-	system("pause");
+	//system("pause");
 
 	return 0;
 }
