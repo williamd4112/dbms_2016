@@ -31,6 +31,7 @@ enum QueryExceptionType
 	EXPR_SYNTAX_ERROR,
 	UNDEFINED_EXPR,
 	UNDEFINED_TOKEN_TYPE,
+	UNSUPPORTED_QUERY,
 	ACCESS_VIOLATION
 };
 
@@ -221,11 +222,11 @@ private:
 	inline void parse_aggregation_list(
 		std::vector<sql::AggregationFunction*> aggregation_list);
 
-	inline void execute_select_print_all(
+	inline void execute_select_traverse_print_all(
 		std::vector<unsigned int> &pageAddrs,
 		unsigned int depth);
 
-	inline void execute_select_aggregate_all(
+	inline void execute_select_traverse_aggregate_all(
 		std::vector<unsigned int> &pageAddrs,
 		unsigned int depth);
 
@@ -259,6 +260,9 @@ private:
 
 	inline bool parse_operator(
 		sql::Expr *expr);
+	
+	inline bool is_table_exist(
+		const char *tablename);
 
 	inline const char *gen_select_column_name(
 		char *buff, 
@@ -318,6 +322,7 @@ inline void QueryExecution<PAGESIZE>::execute(sql::SQLStatement * stmt)
 	}
 	break;
 	default:
+		throw QueryException(UNSUPPORTED_QUERY, "Unsupported query");
 		break;
 	}
 }
@@ -534,6 +539,14 @@ inline bool QueryExecution<PAGESIZE>::parse_operator(
 }
 
 template<unsigned int PAGESIZE>
+inline bool QueryExecution<PAGESIZE>::is_table_exist(const char * tablename)
+{
+	if (tablename != NULL)
+		return mTableMap.find(tablename) != mTableMap.end();
+	return false;
+}
+
+template<unsigned int PAGESIZE>
 inline void QueryExecution<PAGESIZE>::execute_select_list(
 	std::vector<sql::Expr*>& select_list)
 {
@@ -552,7 +565,7 @@ inline void QueryExecution<PAGESIZE>::execute_select_list(
 	case RANGE_FROM:
 	{
 		std::vector<unsigned int> addrs(mTableNum, 0);
-		execute_select_print_all(addrs, 0);
+		execute_select_traverse_print_all(addrs, 0);
 	}
 	break;
 	default:
@@ -578,7 +591,7 @@ inline void QueryExecution<PAGESIZE>::execute_aggregation_list(
 	case RANGE_FROM:
 		{
 			std::vector<unsigned int> addrs(mTableNum, 0);
-			execute_select_aggregate_all(addrs, 0);
+			execute_select_traverse_aggregate_all(addrs, 0);
 		}
 		break;
 	default:
@@ -620,7 +633,7 @@ inline void QueryExecution<PAGESIZE>::parse_aggregation_list(
 }
 
 template<unsigned int PAGESIZE>
-inline void QueryExecution<PAGESIZE>::execute_select_print_all(
+inline void QueryExecution<PAGESIZE>::execute_select_traverse_print_all(
 	std::vector<unsigned int>& pageAddrs,
 	unsigned int depth)
 {
@@ -636,7 +649,7 @@ inline void QueryExecution<PAGESIZE>::execute_select_print_all(
 		}
 		else
 		{
-			execute_select_print_all(pageAddrs, depth + 1);
+			execute_select_traverse_print_all(pageAddrs, depth + 1);
 		}
 	}
 }
@@ -658,7 +671,7 @@ inline void QueryExecution<PAGESIZE>::print_select_column_with_entries(
 }
 
 template<unsigned int PAGESIZE>
-inline void QueryExecution<PAGESIZE>::execute_select_aggregate_all(
+inline void QueryExecution<PAGESIZE>::execute_select_traverse_aggregate_all(
 	std::vector<unsigned int>& pageAddrs, 
 	unsigned int depth)
 {
@@ -673,7 +686,7 @@ inline void QueryExecution<PAGESIZE>::execute_select_aggregate_all(
 		}
 		else
 		{
-			execute_select_aggregate_all(pageAddrs, depth + 1);
+			execute_select_traverse_aggregate_all(pageAddrs, depth + 1);
 		}
 	}
 }
@@ -774,22 +787,27 @@ inline void QueryExecution<PAGESIZE>::parse_select_entry(
 			// A little trick: since SUM(*) is invalid, so only COUNT(*) can be possible
 			mSelectEntries.push_back(SelectEntry
 				(0, &kStarAttr, "COUNT(*)", type));
-			return;
 		}
-
-		for (int i = 0; i < mTableNum; i++)
+		else
 		{
-			/// TODO: If star with table name, do filtering
-			const TableFile &tablefile = mpTables[i]->tablefile();
-			for (int j = 0; j < tablefile.get_table_header().attrNum; j++)
+			for (int i = 0; i < mTableNum; i++)
 			{
-				assert(mpTables[i] != NULL);
+				/// TODO: If star with table name, do filtering
+				const TableFile &tablefile = mpTables[i]->tablefile();
+				for (int j = 0; j < tablefile.get_table_header().attrNum; j++)
+				{
+					assert(mpTables[i] != NULL);
 
-				table_attr_desc_t *desc = tablefile.get_attr_desc(j);
-				mSelectEntries.push_back(SelectEntry
-					(i, desc, gen_select_column_name(view_name, mpTables[i]->get_name(), desc->name, NULL, type), type));
+					/// TODO: Use table map to specify later
+					// Check table name if has
+					if (expr.hasTable() && !is_table_exist(expr.table))
+						continue;
+
+					table_attr_desc_t *desc = tablefile.get_attr_desc(j);
+					mSelectEntries.push_back(SelectEntry
+						(i, desc, gen_select_column_name(view_name, mpTables[i]->get_name(), desc->name, NULL, type), type));
+				}
 			}
-
 		}
 	}
 	else if (expr.type == sql::kExprColumnRef)
@@ -869,7 +887,8 @@ inline void QueryExecution<PAGESIZE>::print_select_entries(std::vector<SelectEnt
 		assert(desc != NULL);
 
 		const int width = (std::get<3>(selectEntries[i]) == SelectEntryType::COLUMN) ? 
-			((desc->type == ATTR_TYPE_INTEGER) ? 11 : desc->size) : 20;
+			((desc->type == ATTR_TYPE_INTEGER) ? INT_OUTPUT_WIDTH : desc->size) : 
+			LONG_LONG_OUTPUT_WIDTH;
 		printf("%-*s", width, std::get<2>(selectEntries[i]).c_str());
 		width_sum += width;
 	}
@@ -881,7 +900,7 @@ inline void QueryExecution<PAGESIZE>::print_aggregation_counter()
 {
 	for (int i = 0; i < mAggregationCounter.size(); i++)
 	{
-		printf("%-*lld",20, mAggregationCounter[i]);
+		printf("%-*lld",LONG_LONG_OUTPUT_WIDTH, mAggregationCounter[i]);
 	}
 	putchar('\n');
 }

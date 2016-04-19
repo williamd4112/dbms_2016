@@ -2,6 +2,9 @@
 
 #include "RecordTable.h"
 
+#define INT_OUTPUT_WIDTH 20
+#define LONG_LONG_OUTPUT_WIDTH 28
+
 namespace db
 {
 	enum DatabaseUtilException

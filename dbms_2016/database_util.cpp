@@ -27,7 +27,7 @@ void db::print_record(const table_attr_desc_t * pDesc, const unsigned char * pRe
 	{
 	case ATTR_TYPE_INTEGER:
 		memcpy(&ival, pRecord + pDesc->offset, pDesc->size);
-		printf("%-*d", 11, ival);
+		printf("%-*d", INT_OUTPUT_WIDTH, ival);
 		break;
 	case ATTR_TYPE_VARCHAR:
 		memcpy(sval, pRecord + pDesc->offset, pDesc->size);
