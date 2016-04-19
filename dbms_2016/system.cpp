@@ -11,6 +11,9 @@ bool quiet = true;
 bool quiet = false;
 #endif
 
+bool pause_at_exit = true;
+bool interactive = false;
+
 void fatal_error()
 {
 	// TODO: write a proper exception handling routine for this

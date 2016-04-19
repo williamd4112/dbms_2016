@@ -28,6 +28,7 @@ using namespace sql;
 void test_db_1();
 
 static void parse_stream(istream &ifs, bool is_prompt);
+static void parse_file(const char *);
 
 static Database<PAGESIZE_8K> database("database.dbs");
 
@@ -37,20 +38,44 @@ static Database<PAGESIZE_8K> database("database.dbs");
 */
 int main(int argc, char *argv[])
 {
-	freopen("output.txt", "w", stdout);
+	quiet = false;
 
-	if (argc >= ARGC_FILE_IMPORT) // File import
+	int i = 1;
+	if (i < argc)
 	{
-		for (int i = ARGV_FILE_IMPORT; i < argc; i++)
+		if (strcmp("-w", argv[i]) == 0)
 		{
-			cout << PROMPT_PREFIX << " pre load " << argv[i] << endl;
-			ifstream ifs(argv[i], std::ios::in);
-			parse_stream(ifs, false);
+			i++;
+			if (i + 1 < argc)
+			{
+				freopen(argv[i], "w", stdout);
+				i++;
+				pause_at_exit = false;
+				quiet = true;
+			}
 		}
 	}
-	//parse_stream(cin, true);
 
-	//system("pause");
+	if (i < argc)
+	{
+		if (strcmp("-i", argv[i]) == 0)
+		{
+			i++;
+			interactive = true;
+		}
+	}
+
+	for (; i < argc; i++)
+	{
+		cout << PROMPT_PREFIX << "load " << argv[i] << endl;
+		parse_file(argv[i]);
+	}
+	
+	if(interactive)
+		parse_stream(cin, true);
+
+	if(pause_at_exit)
+		system("pause");
 
 	return 0;
 }
@@ -111,4 +136,12 @@ void parse_stream(istream &ifs, bool is_prompt)
 		if (is_prompt) cout << PROMPT_PREFIX;
 	}
 
+}
+
+void parse_file(const char *filename)
+{
+	std::ifstream ifs(filename);
+	std::string content((std::istreambuf_iterator<char>(ifs)),
+		(std::istreambuf_iterator<char>()));
+	database.execute(content);
 }

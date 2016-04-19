@@ -38,7 +38,7 @@ private:
 	
 	void error_handler(DatabaseErrorType);
 	void exec_error_handler(QueryException &e);
-	void db_errro_handler(db::DatabaseUtilException &e);
+	void db_error_handler(db::DatabaseUtilException &e);
 	bool extract_values(sql::InsertStatement*, RecordTable<PAGESIZE> *);
 	bool extract_value(const sql::Expr *, const table_attr_desc_t*);
 };
@@ -61,9 +61,7 @@ inline Database<PAGESIZE>::~Database()
 template<unsigned int PAGESIZE>
 inline void Database<PAGESIZE>::execute(std::string &query)
 {
-	printf("%s execute: %s\n", PROMPT_PREFIX, query.c_str());
 	sql::SQLParserResult *parser = sql::SQLParser::parseSQLString(query);
-
 	if (parser->isValid)
 	{
 		for (sql::SQLStatement *stmt : parser->statements)
@@ -74,6 +72,7 @@ inline void Database<PAGESIZE>::execute(std::string &query)
 			{
 				try
 				{
+					printf("-----------------------------------------------------------\n");
 					QueryExecution<PAGESIZE> exec(mDatabaseFile);
 					exec.execute(stmt);
 				}
@@ -83,7 +82,7 @@ inline void Database<PAGESIZE>::execute(std::string &query)
 				}
 				catch (db::DatabaseUtilException e)
 				{
-					db_errro_handler(e);
+					db_error_handler(e);
 				}
 				break;
 			}
@@ -204,13 +203,13 @@ inline void Database<PAGESIZE>::exec_error_handler(QueryException & e)
 		Error("%s %s\n", PROMPT_PREFIX, e.msg.c_str());
 		break;
 	default:
-		Error("%s unhandled error: %d\n", PROMPT_PREFIX, e.type);
+		Error("%s error: %d, %s\n", PROMPT_PREFIX, e.type, e.msg.c_str());
 		break;
 	}
 }
 
 template<unsigned int PAGESIZE>
-inline void Database<PAGESIZE>::db_errro_handler(db::DatabaseUtilException & e)
+inline void Database<PAGESIZE>::db_error_handler(db::DatabaseUtilException & e)
 {
 	switch (e)
 	{

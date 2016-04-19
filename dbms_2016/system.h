@@ -5,6 +5,8 @@
 #define Warning printf
 
 extern bool quiet;
+extern bool pause_at_exit;
+extern bool interactive;
 
 typedef void(*Routine)();
 
