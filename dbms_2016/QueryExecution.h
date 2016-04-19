@@ -425,7 +425,16 @@ inline bool QueryExecution<PAGESIZE>::parse_expr(
 		parse_coldef(expr);
 		break;
 	case sql::kExprOperator:
-		result = parse_operator(expr);
+		if (expr->op_type == sql::Expr::OperatorType::UMINUS)
+		{
+			/// TODO: handling minus more elegant later
+			const sql::Expr *lookahead_expr = expr->expr;
+			if (lookahead_expr == NULL && lookahead_expr->type != sql::kExprLiteralInt)
+				throw QueryException(EXPR_SYNTAX_ERROR);
+			mParseStack.push(StmtToken(-(int)lookahead_expr->ival));
+		}
+		else
+			result = parse_operator(expr);
 		break;
 	default:
 		throw QueryException(UNDEFINED_EXPR);
@@ -445,11 +454,12 @@ inline bool QueryExecution<PAGESIZE>::parse_coldef(
 	{
 		// Try tablename, alias to find table id so that access table pointer
 		auto result = mTableMap.find(expr->table);
+		if (result == mTableMap.end())
+			throw QueryException(WHERE_TABLEREF_ERROR);
+
 		unsigned int tid = result->second;
 		
 		Table *pTable = mpTables[tid];
-		if(pTable == NULL)
-			throw QueryException(WHERE_TABLEREF_ERROR);
 
 		table_attr_desc_t *pAttrDesc = NULL;
 		if (result != mTableMap.end())
@@ -479,8 +489,10 @@ inline bool QueryExecution<PAGESIZE>::parse_coldef(
 				ref_cnt++;
 			}
 		}
-	}
 
+		if(ref_cnt == 0)
+			throw QueryException(WHERE_COLUMN_UNDEFINED, expr->name);
+	}
 
 	return false;
 }
@@ -698,22 +710,34 @@ inline void QueryExecution<PAGESIZE>::execute_select_aggregate_entries(
 {
 	for (unsigned int i = 0; i < mSelectEntries.size(); i++)
 	{
-		unsigned int tid = std::get<0>(mSelectEntries[i]);
-		unsigned int addr = pageAddrs[baseoffset + tid];
-		unsigned char *record = mpTables[tid]->records().get_record(addr);
 		table_attr_desc_t *desc = std::get<1>(mSelectEntries[i]);
-
 		SelectEntryType type = std::get<3>(mSelectEntries[i]);
 		switch (type)
 		{
 		case COUNT:
+		{
+			unsigned int tid = std::get<0>(mSelectEntries[i]);
+			unsigned int addr = pageAddrs[baseoffset + tid];
+			unsigned char *record = mpTables[tid]->records().get_record(addr);
+
+			// Check null column
+			if (desc->type == ATTR_TYPE_VARCHAR &&
+				strlen(db::parse_varchar(record, *desc)) == 0)
+				continue;
 			mAggregationCounter[i]++;
 			break;
+		}
 		case SUM:
-			if(desc->type == ATTR_TYPE_STAR) 
+		{
+			if (desc->type == ATTR_TYPE_STAR)
 				throw QueryException(EXPR_SYNTAX_ERROR, "SUM(*) is invalid.");
+			unsigned int tid = std::get<0>(mSelectEntries[i]);
+			unsigned int addr = pageAddrs[baseoffset + tid];
+			unsigned char *record = mpTables[tid]->records().get_record(addr);
+
 			mAggregationCounter[i] += db::parse_int(record, *desc);
 			break;
+		}
 		default:
 			throw QueryException(EXPR_SYNTAX_ERROR, "Syntax error on aggrgation query.");
 			break;
@@ -786,7 +810,10 @@ inline void QueryExecution<PAGESIZE>::parse_select_entry(
 		{
 			// A little trick: since SUM(*) is invalid, so only COUNT(*) can be possible
 			mSelectEntries.push_back(SelectEntry
-				(0, &kStarAttr, "COUNT(*)", type));
+				(0, 
+				&kStarAttr, 
+				gen_select_column_name(view_name, expr.table, "*", NULL, type), 
+				type));
 		}
 		else
 		{
@@ -805,7 +832,12 @@ inline void QueryExecution<PAGESIZE>::parse_select_entry(
 
 					table_attr_desc_t *desc = tablefile.get_attr_desc(j);
 					mSelectEntries.push_back(SelectEntry
-						(i, desc, gen_select_column_name(view_name, mpTables[i]->get_name(), desc->name, NULL, type), type));
+						(i, 
+						desc, 
+						gen_select_column_name(view_name, mpTables[i]->get_name(), 
+						desc->name, 
+						NULL, 
+						type), type));
 				}
 			}
 		}

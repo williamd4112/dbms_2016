@@ -200,7 +200,7 @@ inline void Database<PAGESIZE>::exec_error_handler(QueryException & e)
 		Error("%s %s table undefined.\n", PROMPT_PREFIX, e.msg.c_str());
 		break;
 	case EXPR_SYNTAX_ERROR:
-		Error("%s %s\n", PROMPT_PREFIX, e.msg.c_str());
+		Error("%s Syntax error: %s\n", PROMPT_PREFIX, e.msg.c_str());
 		break;
 	default:
 		Error("%s error: %d, %s\n", PROMPT_PREFIX, e.type, e.msg.c_str());

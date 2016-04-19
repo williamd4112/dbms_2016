@@ -16,7 +16,10 @@ char * db::parse_varchar(unsigned char * const record, const table_attr_desc_t &
 	if (desc.type != ATTR_TYPE_VARCHAR)
 		throw TYPE_CAST_ERROR;
 
-	return (reinterpret_cast<char*>(&record[desc.offset]));
+	char *ret = (reinterpret_cast<char*>(&record[desc.offset]));
+	if (ret == NULL)
+		throw BAD_ADDR;
+	return ret;
 }
 
 void db::print_record(const table_attr_desc_t * pDesc, const unsigned char * pRecord)
@@ -31,7 +34,7 @@ void db::print_record(const table_attr_desc_t * pDesc, const unsigned char * pRe
 		break;
 	case ATTR_TYPE_VARCHAR:
 		memcpy(sval, pRecord + pDesc->offset, pDesc->size);
-		if (sval[0] == '\0') printf("NULL");
+		if (sval[0] == '\0') printf("%-*s", pDesc->size, "NULL");
 		else printf("%-*s",pDesc->size, sval);
 		break;
 	case ATTR_TYPE_UNDEFINED:
