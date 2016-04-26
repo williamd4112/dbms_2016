@@ -73,14 +73,16 @@ template<unsigned int PAGESIZE>
 inline bool DatabaseFile<PAGESIZE>::create_table(const char *, table_attr_desc_t *, unsigned int)
 {
 	RecordTable<PAGESIZE> *rt = allocate_table();
-	rt->create(tablename, attrNum, pDescs);
+	
 	auto result = insert_to_table(tablename, rt);
 
 	if (!result.second)
 	{
 		fprintf(stderr, "DatabaseFile::create_table(): duplicated table, %s\n", tablename);
 	}
-
+	else
+		rt->create(tablename, attrNum, pDescs);
+	
 	return result.second;
 }
 

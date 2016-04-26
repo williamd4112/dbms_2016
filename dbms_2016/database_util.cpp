@@ -24,6 +24,8 @@ char * db::parse_varchar(unsigned char * const record, const table_attr_desc_t &
 
 void db::print_record(const table_attr_desc_t * pDesc, const unsigned char * pRecord)
 {
+	assert(pDesc != NULL);
+
 	int ival;
 	char sval[ATTR_SIZE_MAX];
 	switch (pDesc->type)
