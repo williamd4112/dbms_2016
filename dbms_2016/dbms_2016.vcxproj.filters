@@ -30,9 +30,6 @@
     <ClCompile Include="Record.cpp">
       <Filter>原始程式檔</Filter>
     </ClCompile>
-    <ClCompile Include="HashIndexFile.cpp">
-      <Filter>原始程式檔</Filter>
-    </ClCompile>
     <ClCompile Include="PageFreeMapFile.cpp">
       <Filter>原始程式檔</Filter>
     </ClCompile>
@@ -87,13 +84,16 @@
     <ClCompile Include="ChainHashIndex.cpp">
       <Filter>原始程式檔</Filter>
     </ClCompile>
-    <ClCompile Include="BinaryObject.cpp">
-      <Filter>原始程式檔</Filter>
-    </ClCompile>
     <ClCompile Include="database_util.cpp">
       <Filter>原始程式檔</Filter>
     </ClCompile>
     <ClCompile Include="test.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="IndexFile.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="HashIndexFile.cpp">
       <Filter>原始程式檔</Filter>
     </ClCompile>
   </ItemGroup>
@@ -108,9 +108,6 @@
       <Filter>標頭檔</Filter>
     </ClInclude>
     <ClInclude Include="Record.h">
-      <Filter>標頭檔</Filter>
-    </ClInclude>
-    <ClInclude Include="HashIndexFile.h">
       <Filter>標頭檔</Filter>
     </ClInclude>
     <ClInclude Include="Bit.h">
@@ -198,6 +195,12 @@
       <Filter>標頭檔</Filter>
     </ClInclude>
     <ClInclude Include="test.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="IndexFile.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="database_type.h">
       <Filter>標頭檔</Filter>
     </ClInclude>
   </ItemGroup>

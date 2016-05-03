@@ -1,12 +1,2 @@
-#include "HashIndexFile.h"
+#include "IndexFile.h"
 
-
-
-HashIndexFile::HashIndexFile()
-{
-}
-
-
-HashIndexFile::~HashIndexFile()
-{
-}

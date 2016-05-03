@@ -10,7 +10,7 @@ const char *kAttrTypeNames[] = {"NULL", "INTEGER", "VARCHAR"};
 
 TableFile::TableFile()
 	: mHeader{"null", 0, 0, -1},
-	mAttrDescs(NULL)
+	mAttrDescs(NULL), mIndexDescs(NULL)
 {
 }
 
@@ -27,8 +27,8 @@ const table_header_t &TableFile::get_table_header() const
 
 table_attr_desc_t *TableFile::get_attr_desc(const char *attrName) const
 {
-	AttrDictionary::const_iterator it = mAttrHashIndex.find(attrName);
-	if (it != mAttrHashIndex.end())
+	AttrDictionary::const_iterator it = mAttrLookupTable.find(attrName);
+	if (it != mAttrLookupTable.end())
 	{
 		return it->second;
 	}
@@ -81,12 +81,13 @@ void TableFile::init(const char *name, unsigned int num, table_attr_desc_t *pDes
 	mHeader.primaryKeyIndex = primaryKeyIndex;
 	mHeader.rowsize = 0;
 	mAttrDescs = new table_attr_desc_t[num];
+	mIndexDescs = new table_index_desc_t[num];
 	for (int i = 0; i < num; i++)
 	{
 		mAttrDescs[i] = pDescs[i];
 		mHeader.rowsize += mAttrDescs[i].size;
 	}
-	build_index();
+	build_lookup_table();
 }
 
 void TableFile::init(const char *name, unsigned int num, table_attr_desc_t *pDescs)
@@ -100,6 +101,7 @@ void TableFile::init(const char *name, unsigned int num, table_attr_desc_t *pDes
 	mHeader.primaryKeyIndex = -1; // No PK
 
 	mAttrDescs = new table_attr_desc_t[num];
+	mIndexDescs = new table_index_desc_t[num];
 	for (int i = 0; i < num; i++)
 	{
 		mAttrDescs[i] = pDescs[i];
@@ -113,7 +115,7 @@ void TableFile::init(const char *name, unsigned int num, table_attr_desc_t *pDes
 	
 		mHeader.rowsize += mAttrDescs[i].size;
 	}
-	build_index();
+	build_lookup_table();
 }
 
 void TableFile::init(const char *name, std::vector<sql::ColumnDefinition*>& col_defs)
@@ -127,6 +129,7 @@ void TableFile::init(const char *name, std::vector<sql::ColumnDefinition*>& col_
 	mHeader.primaryKeyIndex = -1; // No PK
 
 	mAttrDescs = new table_attr_desc_t[mHeader.attrNum];
+	mIndexDescs = new table_index_desc_t[mHeader.attrNum];
 
 	unsigned int offset = 0;
 	for (int i = 0; i < col_defs.size(); i++)
@@ -151,13 +154,28 @@ void TableFile::init(const char *name, std::vector<sql::ColumnDefinition*>& col_
 		mHeader.rowsize += mAttrDescs[i].size;
 		offset += mAttrDescs[i].size;
 	}
-	build_index();
+	build_lookup_table();
 }
 
 inline void TableFile::write_back()
 {
 	FileUtil::write_back(mFile, 0, &mHeader, sizeof(table_header_t));
 	FileUtil::write_back(mFile, sizeof(table_header_t), mAttrDescs, mHeader.attrNum * sizeof(table_attr_desc_t));
+
+	// Load index desc
+	char buff[ATTR_NAME_MAX + 1];
+	for (int i = 0; i < mHeader.attrNum; i++)
+	{
+		for (int j = 0; j < 2; j++)
+		{
+			if (mIndexDescs[i].indexes[j].second != NULL)
+			{
+				const std::string &idx_filename = mIndexDescs[i].indexes[j].first;
+				sprintf(buff, "%d\t%d\t%s\n", i, mIndexDescs[i].indexes[j].second->, idx_filename.c_str());
+				fwrite(buff, strlen(buff), 1, mFile);
+			}
+		}
+	}
 }
 
 inline void TableFile::read_from()
@@ -166,10 +184,45 @@ inline void TableFile::read_from()
 	
 	assert(mAttrDescs == NULL);
 	mAttrDescs = new table_attr_desc_t[mHeader.attrNum];
+	mIndexDescs = new table_index_desc_t[mHeader.attrNum];
 
 	FileUtil::read_at(mFile, sizeof(table_header_t), mAttrDescs, mHeader.attrNum * sizeof(table_attr_desc_t));
 
-	build_index();
+	build_lookup_table();
+
+	// Load index desc
+	int attr_id;
+	int type_id;
+	char index_name[ATTR_NAME_MAX + 2];
+
+	while (fscanf(mFile, "%d%d%s", &attr_id, &type_id, index_name) == 3)
+	{
+		attr_domain_t domain = (mAttrDescs[attr_id].type == ATTR_TYPE_INTEGER) ? INTEGER_DOMAIN : VARCHAR_DOMAIN;
+		size_t keysize = mAttrDescs[attr_id].size;
+		IndexFile *idx_file = NULL;
+		switch (type_id)
+		{
+		case HASH:
+			idx_file = new HashIndexFile(domain, keysize);
+			break;
+		case TREE:
+			idx_file = new TreeIndexFile(domain, keysize);
+			break;
+		case PHASH:
+			idx_file = new PrimaryIndexFile(domain, keysize);
+			break;
+		case PTREE:
+			assert("Not yet supported");
+			break;
+		default:
+			Error("TableFile: index type not found.\n");
+			break;
+		}
+		idx_file->open(index_name, "r+");
+		idx_file->read_from();
+
+		mIndexDescs[attr_id].indexes[type_id % 2] = std::pair<std::string, IndexFile*>(index_name, idx_file);
+	}
 }
 
 void TableFile::dump_info()
@@ -189,11 +242,11 @@ void TableFile::dump_info()
 	}
 }
 
-inline void TableFile::build_index()
+inline void TableFile::build_lookup_table()
 {
 	for (int i = 0; i < mHeader.attrNum; i++)
 	{
-		auto result = mAttrHashIndex.insert(attr_name_desc_pair(std::string(mAttrDescs[i].name), &mAttrDescs[i]));
+		auto result = mAttrLookupTable.insert(attr_name_desc_pair(std::string(mAttrDescs[i].name), &mAttrDescs[i]));
 
 		// No duplicated attribute here, should check at top first, not here
 		assert(result.second);

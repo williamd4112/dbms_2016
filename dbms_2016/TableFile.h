@@ -1,6 +1,7 @@
 #pragma once
 
 #include "DiskFile.h"
+#include "IndexFile.h"
 #include "sql/CreateStatement.h"
 
 #include <unordered_map>
@@ -24,6 +25,11 @@
 
 #define ATTR_CONSTRAINT_NO 0x0
 #define ATTR_CONSTRAINT_PRIMARY_KEY 0x1
+
+// Support up to 2 type of index (hash, tree)
+#define INDEX_NUM 2 
+#define INDEX_HASH_POS 0
+#define INDEX_TREE_POS 1
 
 #define ROW_SIZE_MAX (ATTR_NUM_MAX * ATTR_SIZE_MAX)
 
@@ -56,6 +62,16 @@ struct table_header_t
 	unsigned int attrNum;
 	unsigned int rowsize;
 	int primaryKeyIndex;
+};
+
+/*
+	table_index_desc_t
+	
+	store index file pointer, only (tree, hash) or (hash, tree), no (phash, hash)
+*/
+struct table_index_desc_t
+{
+	std::pair<std::string, IndexFile *> indexes[INDEX_NUM];
 };
 
 /*
@@ -92,9 +108,10 @@ public:
 private:
 	table_header_t mHeader;
 	table_attr_desc_t *mAttrDescs;
+	table_index_desc_t *mIndexDescs;
 
-	AttrDictionary mAttrHashIndex;
+	AttrDictionary mAttrLookupTable;
 
-	inline void build_index();
+	inline void build_lookup_table();
 };
 

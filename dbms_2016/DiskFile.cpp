@@ -9,7 +9,7 @@ DiskFile::DiskFile() : mFile(NULL)
 
 DiskFile::~DiskFile()
 {
-	if (close() == EOF)
+	if (mFile != NULL && close() == EOF)
 		throw DISKFILE_ERROR_CLOSE;
 }
 

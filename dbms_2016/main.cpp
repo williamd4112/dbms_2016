@@ -3,6 +3,8 @@
 #include <string>
 #include <sstream>
 #include <ctime>
+#include <map>
+#include <unordered_map>
 
 #include "DataPage.h"
 #include "BitmapPageFreeMapFile.h"
@@ -12,6 +14,7 @@
 #include "DatabaseFile.h"
 #include "Bit.h"
 #include "Database.h"
+#include "IndexFile.h"
 
 #include "system.h"
 
@@ -30,6 +33,164 @@ void test_db_1();
 static void parse_stream(istream &ifs, bool is_prompt);
 static void parse_file(const char *);
 
+struct TestObject
+{
+	string sval;
+	int ival;
+};
+
+void test_string()
+{
+	unordered_multimap<int, TestObject> hmmap;
+	for (int i = 0; i < 10000000; i++)
+	{
+		hmmap.insert(pair<int, TestObject>(i, TestObject{"Hello", 1}));
+	}
+}
+
+void test_charpointer()
+{
+	unordered_multimap<int, char*> hmmap;
+	for (int i = 0; i < 10000000; i++)
+	{
+		hmmap.insert(pair<int, char*>(i, new char[40]));
+	}
+}
+
+void test_unorderedmap()
+{
+	unordered_multimap<int, string> hmmap;
+	hmmap.insert(pair<int, string>(1, "Book1"));
+	hmmap.insert(pair<int, string>(1, "Book1_1"));
+	hmmap.insert(pair<int, string>(1, "Book1_2"));
+	hmmap.insert(pair<int, string>(2, "Book2_1"));
+	hmmap.insert(pair<int, string>(2, "Book2_2"));
+	hmmap.insert(pair<int, string>(3, "Book3_1"));
+	hmmap.insert(pair<int, string>(3, "Book3_1"));
+	hmmap.insert(pair<int, string>(4, "Book4_1"));
+	hmmap.insert(pair<int, string>(5, "Book5_1"));
+
+	auto start = hmmap.equal_range(6);
+
+	for (auto it = start.first; it != start.second; it++)
+	{
+		cout << it->first << " -> " << it->second << endl;
+	}
+
+
+	system("pause");
+
+}
+
+void test_multimap()
+{
+	multimap<int, string> mmap;
+	mmap.insert(pair<int, string>(1, "Book1"));
+	mmap.insert(pair<int, string>(1, "Book1_1"));
+	mmap.insert(pair<int, string>(1, "Book1_2"));
+	mmap.insert(pair<int, string>(2, "Book2_1"));
+	mmap.insert(pair<int, string>(2, "Book2_2"));
+	mmap.insert(pair<int, string>(3, "Book3_1"));
+	mmap.insert(pair<int, string>(3, "Book3_1"));
+	mmap.insert(pair<int, string>(4, "Book4_1"));
+	mmap.insert(pair<int, string>(5, "Book5_1"));
+
+	multimap<int, string>::iterator start = mmap.lower_bound(1);
+	multimap<int, string>::iterator end = mmap.upper_bound(3);
+
+	for (multimap<int, string>::iterator it = start; it != end; it++)
+	{
+		cout << it->first << " -> " << it->second << endl;
+	}
+
+}
+
+void test_multimap2()
+{
+	multimap<int, string> mmap;
+	for (int i = 0; i < 10000000; i++)
+	{
+		mmap.insert(pair<int, string>(i, "A"));
+	}
+}
+
+void test_hashindex_write()
+{
+	HashIndexFile hindex(INTEGER_DOMAIN, sizeof(int));
+	hindex.open("hashindex.idx", "w+");
+	for (int i = 0; i < 10; i++)
+	{
+		hindex.set(attr_t(i % 10), i * 10);
+	}
+	hindex.dump();
+	hindex.write_back();
+}
+
+void test_hashindex_read()
+{
+	HashIndexFile hindex(INTEGER_DOMAIN, sizeof(int));
+	hindex.open("hashindex.idx", "r+");
+	hindex.read_from();
+	hindex.dump();
+}
+
+void test_pkindex_write()
+{
+	PrimaryIndexFile pkindexx(VARCHAR_DOMAIN, 20);
+	pkindexx.open("pkindex.idx", "w+");
+	
+	char buff[ATTR_SIZE_MAX];
+	for (int i = 0; i < 100; i++)
+	{
+		sprintf(buff, "Book%d",i);
+		pkindexx.set(attr_t(buff), i);
+	}
+	pkindexx.dump();
+	pkindexx.write_back();
+}
+
+void test_pkindex_read()
+{
+	PrimaryIndexFile pkindexx(VARCHAR_DOMAIN, 20);
+	pkindexx.open("pkindex.idx", "r+");
+	pkindexx.read_from();
+	pkindexx.dump();
+}
+
+void test_treeindex_write()
+{
+	TreeIndexFile tindex(INTEGER_DOMAIN, sizeof(int));
+	tindex.open("tindex.idx", "w+");
+
+	for (int i = 0; i < 100; i++)
+	{
+		tindex.set(i, i * 10);
+	}
+	tindex.dump();
+	tindex.write_back();
+}
+
+void test_treeindex_read()
+{
+	TreeIndexFile tindex(INTEGER_DOMAIN, sizeof(int));
+	tindex.open("tindex.idx", "r+");
+	tindex.read_from();
+	tindex.dump();
+}
+
+void test_treeindex_read_range()
+{
+	TreeIndexFile tindex(INTEGER_DOMAIN, sizeof(int));
+	tindex.open("tindex.idx", "r+");
+	tindex.read_from();
+	
+	vector<uint32_t> addrs;
+	tindex.get(10, 20, addrs);
+
+	for (vector<uint32_t>::iterator it = addrs.begin(); it != addrs.end(); it++)
+		cout << *it << endl;
+}
+
 static Database<PAGESIZE_8K> database("database.dbs");
 
 /*
@@ -38,6 +199,16 @@ static Database<PAGESIZE_8K> database("database.dbs");
 */
 int main(int argc, char *argv[])
 {
+	profile_pefromance(test_treeindex_write);
+	profile_pefromance(test_treeindex_read_range);
+	//profile_pefromance(test_hashindex_read);
+	//test_unorderedmap();
+	//printf("%d\n",sizeof(string));
+
+
+	system("pause");
+	return 0;
+
 	quiet = false;
 
 	int i = 1;
