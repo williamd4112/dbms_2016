@@ -17,6 +17,7 @@ bool interactive = false;
 void fatal_error()
 {
 	// TODO: write a proper exception handling routine for this
+	printf("Runtime fatal error.\n");
 	system("pause");
 	exit(-1);
 }

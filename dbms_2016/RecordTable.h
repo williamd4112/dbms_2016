@@ -11,10 +11,12 @@ enum RecordTableException
 {
 	NO_EXCEPTION,
 	BAD_ADDR,
-	DUPLICATED_RECORD
+	ATTR_NOT_FOUND,
+	PKINDEX_NOT_FOUND,
+	UNDEFINED_PK_ATTR,
+	DUPLICATED_RECORD,
+	DUPLICATED_INDEX
 };
-
-
 
 template <unsigned int PAGESIZE>
 class RecordTable
@@ -45,11 +47,18 @@ public:
 	~RecordTable();
 
 	inline void load(const char *);
+	
+	/// Deprecated
 	inline void create(const char *, unsigned int attrNum, table_attr_desc_t *, int);
+	/// Deprecated
 	inline void create(const char *, unsigned int attrNum, table_attr_desc_t *);
+	
 	inline void create(const char *, std::vector<sql::ColumnDefinition*>&);
+	inline void create_index(const char *attr_name, const char *index_name, IndexType index_type);
 
 	inline bool insert(void *);
+	
+	/// Deprecated
 	inline bool select_show(const char **, unsigned int);
 	
 	BitmapPageFreeMapFile<PAGESIZE> &freemap();
@@ -83,6 +92,8 @@ private:
 
 	inline void open_all(const char *, const char *);
 	inline bool check_duplicated(const void *src);
+	inline int get_pk_index();
+	inline void update_index(void *, uint32_t);
 };
 
 template<unsigned int PAGESIZE>
@@ -106,8 +117,6 @@ inline void RecordTable<PAGESIZE>::load(const char *tablename)
 #endif
 
 	mRecordFile.init(mTableFile.get_row_size());
-
-	// TODO: Load index if has
 }
 
 /*
@@ -137,6 +146,13 @@ inline void RecordTable<PAGESIZE>::create(const char *tablename, std::vector<sql
 	open_all(tablename, "wb+");
 	mTableFile.init(tablename, col_defs);
 	mRecordFile.init(mTableFile.get_row_size());
+}
+
+template<unsigned int PAGESIZE>
+inline void RecordTable<PAGESIZE>::create_index(const char * attr_name, const char * index_name, IndexType index_type)
+{
+	if (mTableFile.init_index(attr_name, index_name, index_type) & TABLEFILE_ERROR_DUPLICATE_INDEX)
+		throw DUPLICATED_INDEX;
 }
 
 /*
@@ -184,6 +200,10 @@ inline bool RecordTable<PAGESIZE>::insert(void * src)
 #endif
 		if(!(result & BIT_SUCCESS))
 			success = false;
+		else if (get_pk_index() >= 0)
+		{
+			update_index(src, addr);
+		}
 
 		mFreemapFile.set_page_present(free_page_id);
 
@@ -276,8 +296,12 @@ inline const char *RecordTable<PAGESIZE>::get_error_msg(RecordTableException e)
 		return "Bad adddress";
 	case DUPLICATED_RECORD:
 		return "Duplicated record";
+	case ATTR_NOT_FOUND:
+		return "Attribute not found";
+	case PKINDEX_NOT_FOUND:
+		return "Primary key index not found";
 	default:
-		return "No error";
+		return "Undefined error";
 		break;
 	}
 }
@@ -418,7 +442,7 @@ inline bool RecordTable<PAGESIZE>::check_duplicated(const void * src)
 {
 	// Check Duplicate
 	int pkIndex = mTableFile.get_table_header().primaryKeyIndex;
-	bool isDuplicate;
+	bool isDuplicate = true;
 	if (pkIndex < 0)
 	{
 		// When no primary key
@@ -426,6 +450,7 @@ inline bool RecordTable<PAGESIZE>::check_duplicated(const void * src)
 	}
 	else
 	{
+#ifdef _PK_NOINDEX
 		// Get field value from src
 		const table_attr_desc_t *desc = mTableFile.get_attr_desc(pkIndex);
 		const unsigned char *col_src = (const unsigned char *)src;
@@ -434,9 +459,39 @@ inline bool RecordTable<PAGESIZE>::check_duplicated(const void * src)
 			desc->offset, 
 			desc->size, 
 			&isDuplicate);
+#endif
+		const table_attr_desc_t *desc = mTableFile.get_attr_desc(pkIndex);
+		if (desc == NULL)
+			throw ATTR_NOT_FOUND;
+
+		PrimaryIndexFile *index_file = static_cast<PrimaryIndexFile*>(mTableFile.get_index(desc->name, PHASH));
+		if (index_file == NULL)
+			throw PKINDEX_NOT_FOUND;
+		else
+		{
+			uint32_t match_addr;
+			if (desc->type == ATTR_TYPE_INTEGER)
+				isDuplicate = index_file->get_primary(db::parse_int((unsigned char * const)src, *desc), &match_addr);
+			else if (desc->type == ATTR_TYPE_VARCHAR)
+				isDuplicate = index_file->get_primary(db::parse_varchar((unsigned char * const)src, *desc), &match_addr);
+			else
+				throw UNDEFINED_PK_ATTR;
+		}
 		
 	}
 	return isDuplicate;
+}
+
+template<unsigned int PAGESIZE>
+inline int RecordTable<PAGESIZE>::get_pk_index()
+{
+	return mTableFile.get_table_header().primaryKeyIndex;
+}
+
+template<unsigned int PAGESIZE>
+inline void RecordTable<PAGESIZE>::update_index(void * src, uint32_t addr)
+{
+	mTableFile.update_index(src, addr);
 }
 
 template<unsigned int PAGESIZE>

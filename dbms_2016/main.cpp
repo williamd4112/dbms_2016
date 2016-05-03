@@ -191,6 +191,20 @@ void test_treeindex_read_range()
 		cout << *it << endl;
 }
 
+void test_createindex()
+{
+	Database<PAGESIZE_8K> database("database_test.dbs");
+	database.execute(std::string("CREATE TABLE Employee (id INT PRIMARY KEY, name VARCHAR(20), addr VARCHAR(20), gender VARCHAR(15))"));
+	
+	char buff[512];
+	for (int i = 0; i < 1000000; i++)
+	{
+		sprintf(buff, "INSERT INTO Employee VALUES (%d, 'Apple%d', 'Addr%d', 'Male');", i, i, i);
+		database.execute(std::string(buff));
+	}
+	//database.execute(std::string("SELECT * FROM Employee;"));
+}
+
 static Database<PAGESIZE_8K> database("database.dbs");
 
 /*
@@ -199,12 +213,12 @@ static Database<PAGESIZE_8K> database("database.dbs");
 */
 int main(int argc, char *argv[])
 {
-	profile_pefromance(test_treeindex_write);
-	profile_pefromance(test_treeindex_read_range);
+	//profile_pefromance(test_treeindex_write);
+	//profile_pefromance(test_treeindex_read_range);
 	//profile_pefromance(test_hashindex_read);
 	//test_unorderedmap();
 	//printf("%d\n",sizeof(string));
-
+	profile_pefromance(test_createindex);
 
 	system("pause");
 	return 0;

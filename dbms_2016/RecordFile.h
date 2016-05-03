@@ -45,7 +45,7 @@
 
 */
 template <size_t PAGESIZE, 
-	unsigned int BUFFER_NUM_ROW = 128, unsigned int BUFFER_NUM_COL = 1, unsigned int BUFFER_SLOT_NUM = BUFFER_NUM_ROW * BUFFER_NUM_COL>
+	unsigned int BUFFER_NUM_ROW = 256, unsigned int BUFFER_NUM_COL = 1, unsigned int BUFFER_SLOT_NUM = BUFFER_NUM_ROW * BUFFER_NUM_COL>
 class RecordFile
 	: public DiskFile
 {

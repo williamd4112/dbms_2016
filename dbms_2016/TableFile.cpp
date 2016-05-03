@@ -1,10 +1,11 @@
 #include "TableFile.h"
 #include "FileUtil.h"
 #include "system.h"
+#include "database_util.h"
 
 #include <cassert>
 
-typedef std::pair<std::string, table_attr_desc_t*> attr_name_desc_pair;
+typedef std::pair<std::string, AttrRecord> attr_name_desc_pair;
 
 const char *kAttrTypeNames[] = {"NULL", "INTEGER", "VARCHAR"};
 
@@ -31,7 +32,7 @@ table_attr_desc_t *TableFile::get_attr_desc(const char *attrName) const
 	AttrDictionary::const_iterator it = mAttrLookupTable.find(attrName);
 	if (it != mAttrLookupTable.end())
 	{
-		return it->second;
+		return it->second.first;
 	}
 	return nullptr;
 }
@@ -66,6 +67,16 @@ const bool TableFile::get_attr_descs(const char **names, unsigned int num, table
 			return false;
 		}
 	}
+}
+
+IndexFile * TableFile::get_index(const char *attr_name, IndexType type)
+{
+	auto res = mAttrLookupTable.find(attr_name);
+	if (res != mAttrLookupTable.end())
+	{
+		return mIndexDescs[res->second.second].indices[type % INDEX_NUM].index_file;
+	}
+	return NULL;
 }
 
 const unsigned int TableFile::get_row_size() const
@@ -158,7 +169,64 @@ void TableFile::init(const char *name, std::vector<sql::ColumnDefinition*>& col_
 		mHeader.rowsize += mAttrDescs[i].size;
 		offset += mAttrDescs[i].size;
 	}
+
 	build_lookup_table();
+	
+	// build primary index
+	char buff[INDEX_FILENAME_MAX];
+	sprintf(buff, "%s_pk.idx", name);
+	init_index(mAttrDescs[mHeader.primaryKeyIndex].name, buff, PHASH);
+}
+
+uint8_t TableFile::init_index(const char * attr_name, const char * index_filename, IndexType index_type)
+{
+	auto res = mAttrLookupTable.find(attr_name);
+	if (res != mAttrLookupTable.end())
+	{
+		const table_attr_desc_t *desc = res->second.first;
+		const int attr_id = res->second.second;
+		const int index_id = index_type % INDEX_NUM;
+
+		// Check duplicated
+		if (mIndexDescs[attr_id].indices[index_id].index_file != NULL)
+		{
+			return TABLEFILE_ERROR_DUPLICATE_INDEX;
+		}
+
+		IndexFile *index_file = allocate_index_file(desc, index_type);
+		mIndexDescs[attr_id].indices[index_id].index_name = index_filename;
+		mIndexDescs[attr_id].indices[index_id].index_file = index_file;
+		
+		index_file->open(attr_name, "w+");
+	}
+
+	return TABLEFILE_NO_ERROR;
+}
+
+void TableFile::update_index(void * src, uint32_t addr)
+{
+	for (int i = 0; i < mHeader.attrNum; i++)
+	{
+		const table_attr_desc_t &attr_desc = mAttrDescs[i];
+		for (int j = 0; j < INDEX_NUM; j++)
+		{
+			IndexFile *index_file = mIndexDescs[i].indices[j].index_file;
+			if (index_file != NULL)
+			{
+				switch (attr_desc.type)
+				{
+				case ATTR_TYPE_INTEGER:
+					index_file->set(db::parse_int((unsigned char * const)src, attr_desc), addr);
+					break;
+				case ATTR_TYPE_VARCHAR:
+					index_file->set(db::parse_varchar((unsigned char * const)src, attr_desc), addr);
+					break;
+				default:
+					throw table_exception_t("Undefined type is not accepted.");
+				}
+			}
+		}
+	}
 }
 
 inline void TableFile::write_back()
@@ -173,7 +241,14 @@ inline void TableFile::write_back()
 	{
 		for (int j = 0; j < INDEX_NUM; j++)
 		{
-			
+			auto index_record = mIndexDescs[i].indices[j];
+			if (index_record.index_file != NULL)
+			{
+				sprintf(buff, "%d\t%d\t%s\n", i, index_record.index_file->type(), index_record.index_name.c_str());
+				fwrite(buff, strlen(buff), 1, mFile);
+				mIndexDescs[i].indices[j].index_file->write_back();
+			}
+
 		}
 	}
 }
@@ -184,10 +259,25 @@ inline void TableFile::read_from()
 	
 	assert(mAttrDescs == NULL);
 	mAttrDescs = new table_attr_desc_t[mHeader.attrNum];
+	mIndexDescs = new table_index_desc_t[mHeader.attrNum];
 
 	FileUtil::read_at(mFile, sizeof(table_header_t), mAttrDescs, mHeader.attrNum * sizeof(table_attr_desc_t));
 
 	build_lookup_table();
+
+	char index_name[INDEX_FILENAME_MAX];
+	int attr_id;
+	IndexType index_type;
+
+	while (fscanf(mFile, "%d%d%s", &attr_id, &index_type, index_name) == 3)
+	{
+		IndexFile *index_file = allocate_index_file(&mAttrDescs[attr_id], index_type);
+		mIndexDescs[attr_id].indices[index_type % INDEX_NUM].index_name = index_name;
+		mIndexDescs[attr_id].indices[index_type % INDEX_NUM].index_file = index_file;
+		
+		index_file->open(index_name, "r+");
+		index_file->read_from();
+	}
 }
 
 void TableFile::dump_info()
@@ -204,6 +294,12 @@ void TableFile::dump_info()
 			mAttrDescs[i].offset,
 			mAttrDescs[i].size,
 			(mAttrDescs[i].constraint & ATTR_CONSTRAINT_PRIMARY_KEY ? 1 : 0));
+		for (int j = 0; j < INDEX_NUM; j++)
+		{
+			auto index_record = mIndexDescs[i].indices[j];
+			if(index_record.index_file != NULL)
+				printf("Index:\t%s\t%d\n", index_record.index_name.c_str(), index_record.index_file->type());
+		}
 	}
 }
 
@@ -211,9 +307,60 @@ inline void TableFile::build_lookup_table()
 {
 	for (int i = 0; i < mHeader.attrNum; i++)
 	{
-		auto result = mAttrLookupTable.insert(attr_name_desc_pair(std::string(mAttrDescs[i].name), &mAttrDescs[i]));
+		auto result = mAttrLookupTable.insert(std::pair<std::string, AttrRecord>(mAttrDescs[i].name, AttrRecord(&mAttrDescs[i], i)));
 
 		// No duplicated attribute here, should check at top first, not here
 		assert(result.second);
 	}
+}
+
+inline IndexFile * TableFile::allocate_index_file(const table_attr_desc_t * desc, IndexType type)
+{
+	assert(desc->type != ATTR_TYPE_UNDEFINED);
+
+	IndexFile *index_file = NULL;
+	attr_domain_t domain;
+	switch (desc->type)
+	{
+	case ATTR_TYPE_INTEGER:
+		domain = INTEGER_DOMAIN;
+		break;
+	case ATTR_TYPE_VARCHAR:
+		domain = VARCHAR_DOMAIN;
+		break;
+	default:
+		fatal_error();
+		break;
+	}
+
+	switch (type)
+	{
+	case HASH:
+		index_file = new HashIndexFile(domain, desc->size);
+		break;
+	case TREE:
+		index_file = new TreeIndexFile(domain, desc->size);
+		break;
+	case PHASH:
+		index_file = new PrimaryIndexFile(domain, desc->size);
+		break;
+	default:
+		fatal_error();
+		break;
+	}
+	
+	return index_file;
+}
+
+table_index_desc_t::table_index_desc_t()
+{
+	for (int i = 0; i < INDEX_NUM; i++)
+		indices[i].index_file = NULL;
+}
+
+table_index_desc_t::~table_index_desc_t()
+{
+	for (int i = 0; i < INDEX_NUM; i++)
+		if (indices[i].index_file != NULL)
+			delete indices[i].index_file;
 }

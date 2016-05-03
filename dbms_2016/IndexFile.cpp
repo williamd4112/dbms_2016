@@ -110,7 +110,7 @@ bool PrimaryIndexFile::get(const attr_t & attr_ref, std::vector<uint32_t>& match
 	return false;
 }
 
-bool PrimaryIndexFile::get(const attr_t & attr_ref, uint32_t * match_addr)
+bool PrimaryIndexFile::get_primary(const attr_t & attr_ref, uint32_t * match_addr)
 {
 	assert(match_addr != NULL);
 

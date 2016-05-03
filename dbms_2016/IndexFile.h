@@ -1,7 +1,6 @@
 #pragma once
 
 #include "DiskFile.h"
-#include "TableFile.h"
 #include "database_type.h"
 #include <cassert>
 #include <iostream>
@@ -96,7 +95,7 @@ public:
 
 	bool set(const attr_t &attr_ref, const uint32_t record_addr);
 	bool get(const attr_t &attr_ref, std::vector<uint32_t> &match_addrs);
-	bool get(const attr_t &attr_ref, uint32_t *match_addr);
+	bool get_primary(const attr_t &attr_ref, uint32_t *match_addr);
 
 	void write_back();
 	void read_from();

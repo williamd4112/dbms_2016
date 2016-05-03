@@ -31,6 +31,10 @@ public:
 	~Database();
 
 	inline void execute(std::string&);
+	
+	// TODO : For testing
+	inline void create_index(const char *tablename, const char *attr_name, const char *index_name, IndexType index_type);
+	inline void find(const char *tablename, const char *attr_name, int begin, int end);
 	inline void shutdown();
 private:
 	DatabaseFile<PAGESIZE> mDatabaseFile;
@@ -107,6 +111,10 @@ inline void Database<PAGESIZE>::execute(std::string &query)
 				{
 					error_handler(e);
 				}
+				catch (RecordTableException e)
+				{
+					Error("%s %s\n", PROMPT_PREFIX, RecordTable<PAGESIZE>::get_error_msg(e));
+				}
 				break;
 			}
 			case sql::kStmtCreate:
@@ -132,6 +140,35 @@ inline void Database<PAGESIZE>::execute(std::string &query)
 	else
 	{
 		Error("%s Parsing error: %s\n", PROMPT_PREFIX, parser->errorMsg);
+	}
+}
+
+template<unsigned int PAGESIZE>
+inline void Database<PAGESIZE>::create_index(
+	const char * tablename, 
+	const char * attr_name, 
+	const char * index_name, 
+	IndexType index_type)
+{
+	RecordTable<PAGESIZE> *pTable = mDatabaseFile.get_table(tablename);
+	if (pTable != NULL)
+	{
+		pTable->create_index(attr_name, index_name, index_type);
+		pTable->dump_info();
+	}
+	else
+	{
+		Error("%s failed to create index %s\n", PROMPT_PREFIX, index_name);
+	}
+}
+
+template<unsigned int PAGESIZE>
+inline void Database<PAGESIZE>::find(const char * tablename, const char *attr_name, int begin, int end)
+{
+	RecordTable<PAGESIZE> *pTable = mDatabaseFile.get_table(tablename);
+	if (pTable != NULL)
+	{
+	
 	}
 }
 

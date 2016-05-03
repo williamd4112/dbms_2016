@@ -3,6 +3,8 @@
 #include <stdint.h>
 #include <unordered_map>
 #include <map>
+#include <iostream>
+#include <cassert>
 
 #define ATTR_NUM_MAX 5
 #define ATTR_NAME_MAX 41
