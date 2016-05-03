@@ -18,6 +18,7 @@ TableFile::TableFile()
 TableFile::~TableFile()
 {
 	delete[] mAttrDescs;
+	delete[] mIndexDescs;
 }
 
 const table_header_t &TableFile::get_table_header() const
@@ -80,8 +81,10 @@ void TableFile::init(const char *name, unsigned int num, table_attr_desc_t *pDes
 	mHeader.attrNum = num;
 	mHeader.primaryKeyIndex = primaryKeyIndex;
 	mHeader.rowsize = 0;
+	
 	mAttrDescs = new table_attr_desc_t[num];
 	mIndexDescs = new table_index_desc_t[num];
+
 	for (int i = 0; i < num; i++)
 	{
 		mAttrDescs[i] = pDescs[i];
@@ -102,6 +105,7 @@ void TableFile::init(const char *name, unsigned int num, table_attr_desc_t *pDes
 
 	mAttrDescs = new table_attr_desc_t[num];
 	mIndexDescs = new table_index_desc_t[num];
+
 	for (int i = 0; i < num; i++)
 	{
 		mAttrDescs[i] = pDescs[i];
@@ -162,18 +166,14 @@ inline void TableFile::write_back()
 	FileUtil::write_back(mFile, 0, &mHeader, sizeof(table_header_t));
 	FileUtil::write_back(mFile, sizeof(table_header_t), mAttrDescs, mHeader.attrNum * sizeof(table_attr_desc_t));
 
-	// Load index desc
-	char buff[ATTR_NAME_MAX + 1];
+	// Write back index file
+	// Format: <attr_id> <index_type_id> <index_file_name>
+	char buff[INDEX_RECORD_SIZE_MAX];
 	for (int i = 0; i < mHeader.attrNum; i++)
 	{
-		for (int j = 0; j < 2; j++)
+		for (int j = 0; j < INDEX_NUM; j++)
 		{
-			if (mIndexDescs[i].indexes[j].second != NULL)
-			{
-				const std::string &idx_filename = mIndexDescs[i].indexes[j].first;
-				sprintf(buff, "%d\t%d\t%s\n", i, mIndexDescs[i].indexes[j].second->, idx_filename.c_str());
-				fwrite(buff, strlen(buff), 1, mFile);
-			}
+			
 		}
 	}
 }
@@ -184,45 +184,10 @@ inline void TableFile::read_from()
 	
 	assert(mAttrDescs == NULL);
 	mAttrDescs = new table_attr_desc_t[mHeader.attrNum];
-	mIndexDescs = new table_index_desc_t[mHeader.attrNum];
 
 	FileUtil::read_at(mFile, sizeof(table_header_t), mAttrDescs, mHeader.attrNum * sizeof(table_attr_desc_t));
 
 	build_lookup_table();
-
-	// Load index desc
-	int attr_id;
-	int type_id;
-	char index_name[ATTR_NAME_MAX + 2];
-
-	while (fscanf(mFile, "%d%d%s", &attr_id, &type_id, index_name) == 3)
-	{
-		attr_domain_t domain = (mAttrDescs[attr_id].type == ATTR_TYPE_INTEGER) ? INTEGER_DOMAIN : VARCHAR_DOMAIN;
-		size_t keysize = mAttrDescs[attr_id].size;
-		IndexFile *idx_file = NULL;
-		switch (type_id)
-		{
-		case HASH:
-			idx_file = new HashIndexFile(domain, keysize);
-			break;
-		case TREE:
-			idx_file = new TreeIndexFile(domain, keysize);
-			break;
-		case PHASH:
-			idx_file = new PrimaryIndexFile(domain, keysize);
-			break;
-		case PTREE:
-			assert("Not yet supported");
-			break;
-		default:
-			Error("TableFile: index type not found.\n");
-			break;
-		}
-		idx_file->open(index_name, "r+");
-		idx_file->read_from();
-
-		mIndexDescs[attr_id].indexes[type_id % 2] = std::pair<std::string, IndexFile*>(index_name, idx_file);
-	}
 }
 
 void TableFile::dump_info()

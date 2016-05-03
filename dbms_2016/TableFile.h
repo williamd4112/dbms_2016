@@ -1,7 +1,6 @@
 #pragma once
 
 #include "DiskFile.h"
-#include "IndexFile.h"
 #include "sql/CreateStatement.h"
 
 #include <unordered_map>
@@ -11,29 +10,14 @@
 #include <iostream>
 #include <cassert>
 
-#define ATTR_NUM_MAX 5
-#define ATTR_NAME_MAX 41
-#define TABLE_NAME_MAX ATTR_NAME_MAX
-#define ATTR_SIZE_MAX ATTR_NAME_MAX
+#include "database_type.h"
 
-#define ATTR_TYPE_UNDEFINED 0x0
-#define ATTR_TYPE_INTEGER 0x1
-#define ATTR_TYPE_VARCHAR 0x2
-
-// Star type for QueryExecution aggregation
-#define ATTR_TYPE_STAR 0x4 
-
-#define ATTR_CONSTRAINT_NO 0x0
-#define ATTR_CONSTRAINT_PRIMARY_KEY 0x1
+#define TABLEFILE_EXCEPTION_TOO_MANY_PK -1
 
 // Support up to 2 type of index (hash, tree)
 #define INDEX_NUM 2 
 #define INDEX_HASH_POS 0
 #define INDEX_TREE_POS 1
-
-#define ROW_SIZE_MAX (ATTR_NUM_MAX * ATTR_SIZE_MAX)
-
-#define TABLEFILE_EXCEPTION_TOO_MANY_PK -1
 
 /*
 	table_attr_desc_t
@@ -71,7 +55,11 @@ struct table_header_t
 */
 struct table_index_desc_t
 {
-	std::pair<std::string, IndexFile *> indexes[INDEX_NUM];
+	struct 
+	{
+		std::string index_name;
+		IndexFile *index_file;
+	} indices[INDEX_NUM];
 };
 
 /*

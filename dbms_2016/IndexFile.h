@@ -1,8 +1,10 @@
 #pragma once
 
 #include "DiskFile.h"
-#include "RecordTable.h"
+#include "TableFile.h"
 #include "database_type.h"
+#include <cassert>
+#include <iostream>
 
 enum IndexExceptionType
 {
