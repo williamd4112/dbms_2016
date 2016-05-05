@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <unordered_map>
 #include <map>
+#include <vector>
 #include <iostream>
 #include <cassert>
 
@@ -26,6 +27,8 @@
 #define INDEX_FILENAME_MAX 80
 #define INDEX_RECORD_SIZE_MAX 255
 
+extern const char *kAttrTypeNames[];
+
 enum attr_domain_t
 {
 	INTEGER_DOMAIN,
@@ -38,9 +41,17 @@ struct attr_t
 	union attr_value_t
 	{
 		int integer;
-		char *varchar;
+		char varchar[ATTR_SIZE_MAX];
 		attr_value_t(int _val) : integer(_val) {}
-		attr_value_t(const char *_str) { varchar = _strdup(_str); }
+		attr_value_t(const char *_str) 
+		{
+#ifdef _STRDUP_VER_
+			varchar = _strdup(_str); 
+#else
+			strncpy(varchar, _str, ATTR_SIZE_MAX);
+#endif
+		}
+
 		attr_value_t() {}
 		~attr_value_t() {}
 
@@ -52,7 +63,11 @@ struct attr_t
 
 		attr_value_t& operator=(const char *_val)
 		{
-			varchar = _strdup(_val);
+#ifdef _STRDUP_VER_
+			varchar = _strdup(_str);
+#else
+			strncpy(varchar, _val, ATTR_SIZE_MAX);
+#endif
 			return *this;
 		}
 	};
@@ -94,8 +109,10 @@ public:
 	attr_t &operator=(int _val) { domain = INTEGER_DOMAIN; value = _val; return (*this); }
 	attr_t &operator=(const char *_val)
 	{
+#ifdef _STRDUP_VER_
 		if (domain == VARCHAR_DOMAIN)
 			delete value.varchar;
+#endif
 		domain = VARCHAR_DOMAIN;
 		value = _val;
 		return (*this);
@@ -149,3 +166,4 @@ struct attr_t_hash {
 			return std::hash<std::string>{}(attr.Varchar());
 	}
 };
+

@@ -252,16 +252,16 @@ void test_recordtable_create()
 {
 	structure_record record{ 1, "Williamd", "NTHU", 2 };
 	table_attr_desc_t descs[4] = {
-		{ "ID", ATTR_TYPE_INTEGER, offsetof(structure_record, id), 4 },
-		{ "Name", ATTR_TYPE_VARCHAR, offsetof(structure_record, name), 40 },
-		{ "Addr", ATTR_TYPE_VARCHAR, offsetof(structure_record, addr), 5 },
-		{ "Gender", ATTR_TYPE_INTEGER, offsetof(structure_record, gender), 4 }
+		{ "ID", ATTR_TYPE_INTEGER, offsetof(structure_record, id), 4, ATTR_CONSTRAINT_PRIMARY_KEY },
+		{ "Name", ATTR_TYPE_VARCHAR, offsetof(structure_record, name), 40, 0 },
+		{ "Addr", ATTR_TYPE_VARCHAR, offsetof(structure_record, addr), 5, 0 },
+		{ "Gender", ATTR_TYPE_INTEGER, offsetof(structure_record, gender), 4, 0 }
 	};
 
 	RecordTable<PAGESIZE_8K> rt;
-	rt.create("table", 4, descs, -1);
+	rt.create("table", 4, descs);
 
-	for (int i = 0; i < 10; i++)
+	for (int i = 0; i < 1000000; i++)
 	{
 		rt.insert(&record);
 		record.id++;

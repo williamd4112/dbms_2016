@@ -12,6 +12,7 @@
 #include <cassert>
 
 #include "database_type.h"
+#include "database_table_type.h"
 
 #define TABLEFILE_EXCEPTION_TOO_MANY_PK -1
 #define TABLEFILE_ERROR_DUPLICATE_INDEX 0x2
@@ -22,34 +23,6 @@
 #define INDEX_HASH_POS 0
 #define INDEX_TREE_POS 1
 
-/*
-	table_attr_desc_t
-
-	name: attribute name
-	offset: attribute offset of record
-	size: size of attribute
-*/
-struct table_attr_desc_t
-{
-	char name[ATTR_NAME_MAX];
-	unsigned char type;
-	unsigned int offset;
-	unsigned int size;
-	unsigned char constraint;
-};
-
-/*
-	table_header_t
-
-	store table name, number of attribute
-*/
-struct table_header_t
-{
-	char name[TABLE_NAME_MAX];
-	unsigned int attrNum;
-	unsigned int rowsize;
-	int primaryKeyIndex;
-};
 
 /*
 	table_index_desc_t
@@ -125,6 +98,7 @@ private:
 	AttrDictionary mAttrLookupTable;
 
 	inline void build_lookup_table();
+	inline void build_primary_key_index(const char *name);
 	inline IndexFile * allocate_index_file(const table_attr_desc_t *desc, IndexType type);
 };
 

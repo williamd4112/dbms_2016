@@ -22,6 +22,12 @@
 #include "SQLParserResult.h"
 #include "sqlhelper.h"
 
+#include "SequenceFile.h"
+#include "LightTableFile.h"
+#include "LightTable.h"
+
+#include "test.h"
+
 using namespace std;
 using namespace sql;
 
@@ -195,14 +201,128 @@ void test_createindex()
 {
 	Database<PAGESIZE_8K> database("database_test.dbs");
 	database.execute(std::string("CREATE TABLE Employee (id INT PRIMARY KEY, name VARCHAR(20), addr VARCHAR(20), gender VARCHAR(15))"));
-	
+	//database.create_index("Employee", "name", "Emp_name.idx", HASH);
 	char buff[512];
-	for (int i = 0; i < 1000000; i++)
+	for (int i = 0; i < 1000; i++)
 	{
 		sprintf(buff, "INSERT INTO Employee VALUES (%d, 'Apple%d', 'Addr%d', 'Male');", i, i, i);
 		database.execute(std::string(buff));
 	}
-	//database.execute(std::string("SELECT * FROM Employee;"));
+	//database.execute(std::string("SELECT Employee.id, Employee.name FROM Employee;"));
+}
+
+void test_no_page()
+{
+	std::unordered_map<int, int> m;
+	std::vector<attr_t> v(1000000);
+	char name[255], addr[255];
+	for (int i = 0; i < 1000000; i++)
+	{
+		//v.push_back(structure_record());
+		v[i] = i;
+		m[i] = i;
+	}
+}
+
+void test_seq_file()
+{
+	const SequenceElementType types[] = {
+		SEQ_INT, SEQ_VARCHAR, SEQ_VARCHAR, SEQ_INT
+	};
+
+	char name[255], addr[255];
+
+	std::unordered_map<int, int> m;
+	SequenceFile<attr_t> seqfile(types, 4);
+	seqfile.open("seqfile.seq", "w+");
+	std::vector<attr_t> tuple(4);
+
+	for (int i = 0; i < 1000; i++)
+	{
+		sprintf(name, "Name%d", i);
+		sprintf(addr, "Addr%d", i);
+		tuple[0] = i;
+		tuple[1] = name;
+		tuple[2] = addr;
+		tuple[3] = i * 10;
+		seqfile.put(tuple);
+		m[tuple[0].Int()] = i;
+	}
+
+	for (auto it = seqfile.begin(); it != seqfile.end(); it++)
+	{
+		for (auto e = it->begin(); e != it->end(); e++)
+		{
+			std::cout << *e << "\t";
+		}
+		std::cout << std::endl;
+	}
+	seqfile.write_back();
+}
+
+void test_seq_file_read()
+{
+	const SequenceElementType types[] = {
+		SEQ_INT, SEQ_VARCHAR, SEQ_VARCHAR, SEQ_INT
+	};
+
+	SequenceFile<attr_t> seqfile(types, 4);
+	seqfile.open("seqfile.seq", "r+");
+	seqfile.read_from();
+	for (auto it = seqfile.begin(); it != seqfile.end(); it++)
+	{
+		for (auto e = it->begin(); e != it->end(); e++)
+		{
+			std::cout << *e << "\t";
+		}
+		std::cout << std::endl;
+	}
+}
+
+void test_light_tablefile_write()
+{
+	table_attr_desc_t descs[4] = {
+		{ "ID", ATTR_TYPE_INTEGER, offsetof(structure_record, id), 4, ATTR_CONSTRAINT_PRIMARY_KEY },
+		{ "Name", ATTR_TYPE_VARCHAR, offsetof(structure_record, name), 40, 0 },
+		{ "Addr", ATTR_TYPE_VARCHAR, offsetof(structure_record, addr), 5, 0 },
+		{ "Gender", ATTR_TYPE_INTEGER, offsetof(structure_record, gender), 4, 0 }
+	};
+
+	LightTableFile ltbf("LightTable", descs, 4);
+	ltbf.open("LightTable.tbl", "wb+");
+	ltbf.dump_info();
+	ltbf.write_back();
+}
+
+void test_light_tablefile_read()
+{
+	LightTableFile ltbf;
+	ltbf.open("LightTable.tbl", "rb+");
+	ltbf.read_from();
+	ltbf.dump_info();
+	ltbf.write_back();
+}
+
+void test_light_table()
+{
+	table_attr_desc_t descs[4] = {
+		{ "ID", ATTR_TYPE_INTEGER, offsetof(structure_record, id), 4, ATTR_CONSTRAINT_PRIMARY_KEY },
+		{ "Name", ATTR_TYPE_VARCHAR, offsetof(structure_record, name), 40, 0 },
+		{ "Addr", ATTR_TYPE_VARCHAR, offsetof(structure_record, addr), 5, 0 },
+		{ "Gender", ATTR_TYPE_INTEGER, offsetof(structure_record, gender), 4, 0 }
+	};
+
+	LightTable tbl;
+	tbl.create("TestTable", descs, 4);
+	tbl.dump();
+	tbl.save();
+}
+
+void test_light_table_read()
+{
+	LightTable tbl;
+	tbl.load("TestTable");
+	tbl.dump();
 }
 
 static Database<PAGESIZE_8K> database("database.dbs");
@@ -213,12 +333,8 @@ static Database<PAGESIZE_8K> database("database.dbs");
 */
 int main(int argc, char *argv[])
 {
-	//profile_pefromance(test_treeindex_write);
-	//profile_pefromance(test_treeindex_read_range);
-	//profile_pefromance(test_hashindex_read);
-	//test_unorderedmap();
-	//printf("%d\n",sizeof(string));
-	profile_pefromance(test_createindex);
+	test_light_table();
+	test_light_table_read();
 
 	system("pause");
 	return 0;

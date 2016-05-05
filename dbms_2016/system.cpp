@@ -38,3 +38,17 @@ void profile_pefromance(Routine routine)
 	time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
 	printf("Time elapsed: %lf\n", time_spent);
 }
+
+exception_t::exception_t(uint32_t _code) : 
+	code(_code), msg("No message")
+{
+}
+
+exception_t::exception_t(uint32_t _code, const char * _msg) :
+	code(_code), msg(_msg)
+{
+}
+
+exception_t::~exception_t()
+{
+}
