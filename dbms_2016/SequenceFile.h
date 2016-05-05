@@ -35,8 +35,8 @@ public:
 	SequenceFile();
 	~SequenceFile();
 
-	inline std::vector<E> &get(int index);
-	inline void put(Tuple &tuple);
+	inline std::vector<E> &get(uint32_t index);
+	inline uint32_t put(Tuple &tuple);
 	inline void init(const SequenceElementType *types, int num);
 
 	TupleIterator begin() { return mTuples.begin(); }
@@ -70,18 +70,19 @@ inline SequenceFile<E>::~SequenceFile()
 }
 
 template<class E>
-inline std::vector<E> & SequenceFile<E>::get(int index)
+inline std::vector<E> & SequenceFile<E>::get(uint32_t index)
 {
 	assert(!mTypes.empty());
-	if (index < 0 || index >= mTuples.szize())
+	if (index < 0 || index >= mTuples.size())
 		throw SEQFILE_BAD_POS;
 	return mTuples[index];
 }
 
 template<class E>
-inline void SequenceFile<E>::put(Tuple & tuple)
+inline uint32_t SequenceFile<E>::put(Tuple & tuple)
 {
 	mTuples.push_back(tuple);
+	return mTuples.size() - 1;
 }
 
 template<typename E>

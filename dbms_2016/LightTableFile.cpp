@@ -42,7 +42,7 @@ inline void LightTableFile::create(const char *tablename, AttrDesc * descs, int 
 	build_attr_desc_index();
 }
 
-inline void LightTableFile::create_index(AttrDesc & desc, IndexType type, const char * idx_path)
+inline void LightTableFile::create_index(const AttrDesc & desc, IndexType type, const char * idx_path)
 {
 	IndexFile *idxFile = gen_indexfile(desc, type);
 	auto res = mIndexFileMap.insert({ desc.name, idxFile });
@@ -63,6 +63,28 @@ const AttrDesc &LightTableFile::get_attr_desc(const char * attr_name)
 	if (res == mAttrDescTable.end())
 		throw exception_t(ATTR_NOT_FOUND, attr_name);
 	return *(res->second);
+}
+
+const AttrDescPool & LightTableFile::get_attr_descs()
+{
+	return mAttrDescPool;
+}
+
+IndexFile * LightTableFile::get_index_file(const char *attr_name)
+{
+	auto res = mIndexFileMap.find(attr_name);
+	if (res != mIndexFileMap.end())
+	{
+		return res->second;
+	}
+
+	return nullptr;
+}
+
+const char * LightTableFile::get_pk_attr_name()
+{
+	assert(mTableHeader.primaryKeyIndex >= 0 && mTableHeader.primaryKeyIndex < mTableHeader.attrNum);
+	return mAttrDescPool[mTableHeader.primaryKeyIndex].name;
 }
 
 inline void LightTableFile::write_back()
@@ -126,7 +148,7 @@ void LightTableFile::dump_info()
 		auto res = mIndexFileMap.find(mAttrDescPool[i].name);
 		if (res != mIndexFileMap.end())
 		{
-			printf("%s", res->second->get_filepath().c_str());
+			printf("%s(%d)", res->second->get_filepath().c_str(), res->second->type());
 		}
 		printf("\n");
 	}
@@ -141,7 +163,7 @@ inline void LightTableFile::build_attr_desc_index()
 	}
 }
 
-inline std::string LightTableFile::get_index_file_name_str(const char * attr_name)
+std::string LightTableFile::get_index_file_name_str(const char * attr_name)
 {
 	return std::string(mTableHeader.name) + "_" + std::string(attr_name) + ".idx";
 }

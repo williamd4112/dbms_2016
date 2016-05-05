@@ -36,9 +36,13 @@ public:
 	~LightTableFile();
 	
 	inline void create(const char *tablename, AttrDesc *descs, int num);
-	inline void create_index(AttrDesc &desc, IndexType type, const char *idx_path);
+	inline void create_index(const AttrDesc &desc, IndexType type, const char *idx_path);
 
 	const AttrDesc &get_attr_desc(const char *attr_name);
+	const AttrDescPool &get_attr_descs();
+	const TableHeader &get_header() { return mTableHeader; }
+	IndexFile *get_index_file(const char *attr_name);
+	const char *get_pk_attr_name();
 
 	inline void write_back();
 	inline void read_from();
@@ -51,7 +55,7 @@ private:
 	IndexFileMap mIndexFileMap;
 
 	inline void build_attr_desc_index();
-	inline std::string get_index_file_name_str(const char *attr_name);
+	std::string get_index_file_name_str(const char *attr_name);
 	inline IndexFile *gen_indexfile(const AttrDesc &desc, IndexType index_type);
 };
 

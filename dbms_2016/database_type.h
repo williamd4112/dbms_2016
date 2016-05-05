@@ -29,6 +29,11 @@
 
 extern const char *kAttrTypeNames[];
 
+enum FindType
+{
+	EQ, NEQ, LESS, LARGE
+};
+
 enum attr_domain_t
 {
 	INTEGER_DOMAIN,

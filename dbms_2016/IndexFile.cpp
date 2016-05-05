@@ -28,15 +28,19 @@ bool HashIndexFile::set(const attr_t & attr_ref, const uint32_t record_addr)
 	return mHashIndexTable.insert(pair<attr_t, uint32_t>(attr_ref, record_addr))->second;
 }
 
-bool HashIndexFile::get(const attr_t &attr_ref, std::vector<uint32_t> &match_addrs)
+uint32_t HashIndexFile::get(const attr_t &attr_ref, std::vector<uint32_t> &match_addrs)
 {
 	auto result = mHashIndexTable.equal_range(attr_ref);
 	if (result.first == result.second)
-		return false;
-	
-	for (auto it = result.first; it != result.second; it++)
+		return 0;
+
+	uint32_t cnt = 0;
+	for (auto it = result.first; it != result.second; it++) 
+	{
 		match_addrs.push_back(it->second);
-	return true;
+		cnt++;
+	}
+	return cnt;
 }
 
 void HashIndexFile::write_back()
@@ -99,7 +103,7 @@ bool PrimaryIndexFile::set(const attr_t & attr_ref, const uint32_t record_addr)
 	return mPrimaryIndexTable.insert(pair<attr_t, uint32_t>(attr_ref, record_addr)).second;
 }
 
-bool PrimaryIndexFile::get(const attr_t & attr_ref, std::vector<uint32_t>& match_addrs)
+uint32_t PrimaryIndexFile::get(const attr_t & attr_ref, std::vector<uint32_t>& match_addrs)
 {
 	auto res = mPrimaryIndexTable.find(attr_ref);
 	if (res != mPrimaryIndexTable.end())
@@ -121,6 +125,11 @@ bool PrimaryIndexFile::get_primary(const attr_t & attr_ref, uint32_t * match_add
 		return true;
 	}
 	return false;
+}
+
+bool PrimaryIndexFile::isExist(const attr_t & attr_ref)
+{
+	return (mPrimaryIndexTable.find(attr_ref) != mPrimaryIndexTable.end());
 }
 
 void PrimaryIndexFile::write_back()
@@ -182,27 +191,68 @@ bool TreeIndexFile::set(const attr_t & attr_ref, const uint32_t record_addr)
 	return mTreeIndexTable.insert(pair<attr_t, uint32_t>(attr_ref, record_addr))->second;
 }
 
-bool TreeIndexFile::get(const attr_t & attr_ref, std::vector<uint32_t>& match_addrs)
+uint32_t TreeIndexFile::get(const attr_t & attr_ref, std::vector<uint32_t>& match_addrs)
 {
 	auto result = mTreeIndexTable.equal_range(attr_ref);
 	if (result.first == result.second)
-		return false;
+		return 0;
 
+	uint32_t cnt = 0;
 	for (auto it = result.first; it != result.second; it++)
+	{
 		match_addrs.push_back(it->second);
-	return true;
+		cnt++;
+	}
+	return cnt;
 }
 
-bool TreeIndexFile::get(const attr_t & attr_lower, const attr_t & attr_upper, std::vector<uint32_t>& match_addrs)
+uint32_t TreeIndexFile::get(const attr_t & attr_lower, const attr_t & attr_upper, std::vector<uint32_t>& match_addrs)
 {
 	TreeIndexTable::iterator begin = mTreeIndexTable.lower_bound(attr_lower);
 	TreeIndexTable::iterator end = mTreeIndexTable.upper_bound(attr_upper);
 	if (begin == end)
-		return false;
+		return 0;
 
-	for (auto it = begin; it != end; it++)
+	uint32_t cnt = 0;
+	for (auto it = begin; it != end; it++) 
+	{
 		match_addrs.push_back(it->second);
-	return true;
+		cnt++;
+	}
+	return cnt;
+}
+
+uint32_t TreeIndexFile::get(const attr_t & attr_pivot, FindType find_type, std::vector<uint32_t>& match_addrs)
+{
+	TreeIndexTable::iterator begin;
+	TreeIndexTable::iterator end;
+	
+	switch (find_type)
+	{
+	case EQ:
+		return get(attr_pivot, match_addrs);
+	case NEQ:
+		return 0;
+	case LESS:
+		begin = mTreeIndexTable.begin();
+		end = mTreeIndexTable.lower_bound(attr_pivot);
+		break;
+	case LARGE:
+		begin = mTreeIndexTable.upper_bound(attr_pivot);
+		end = mTreeIndexTable.end();
+		break;
+	default:
+		return 0;
+	}
+
+	uint32_t cnt = 0;
+	for (auto it = begin; it != end; it++)
+	{
+		match_addrs.push_back(it->second);
+		cnt++;
+	}
+	return cnt;
+	
 }
 
 void TreeIndexFile::write_back()

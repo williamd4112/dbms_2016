@@ -303,26 +303,50 @@ void test_light_tablefile_read()
 	ltbf.write_back();
 }
 
-void test_light_table()
+LightTable tbl;
+
+void test_light_table_create()
 {
 	table_attr_desc_t descs[4] = {
 		{ "ID", ATTR_TYPE_INTEGER, offsetof(structure_record, id), 4, ATTR_CONSTRAINT_PRIMARY_KEY },
 		{ "Name", ATTR_TYPE_VARCHAR, offsetof(structure_record, name), 40, 0 },
 		{ "Addr", ATTR_TYPE_VARCHAR, offsetof(structure_record, addr), 5, 0 },
-		{ "Gender", ATTR_TYPE_INTEGER, offsetof(structure_record, gender), 4, 0 }
+		{ "Grade", ATTR_TYPE_INTEGER, offsetof(structure_record, gender), 4, 0 }
 	};
 
-	LightTable tbl;
 	tbl.create("TestTable", descs, 4);
+	tbl.create_index("Grade", TREE);
 	tbl.dump();
-	tbl.save();
+
+	char name[40], addr[40];
+	AttrTuple tuple(4);
+	for (int i = 0; i < 10000; i++)
+	{
+		sprintf(name, "name%d", i);
+		sprintf(addr, "addr%d", i);
+		tuple[0] = i;
+		tuple[1] = name;
+		tuple[2] = addr;
+		tuple[3] = i;
+		tbl.insert(tuple);
+	}
 }
 
 void test_light_table_read()
 {
-	LightTable tbl;
 	tbl.load("TestTable");
 	tbl.dump();
+}
+
+void test_light_table_find()
+{
+	std::vector<uint32_t> match_addrs;
+	tbl.find("Grade", attr_t(9900), LARGE, match_addrs);
+
+	for (int i = 0; i < match_addrs.size(); i++)
+	{
+		std::cout << tbl.get_tuple(match_addrs[i]) << std::endl;
+	}
 }
 
 static Database<PAGESIZE_8K> database("database.dbs");
@@ -333,8 +357,8 @@ static Database<PAGESIZE_8K> database("database.dbs");
 */
 int main(int argc, char *argv[])
 {
-	test_light_table();
-	test_light_table_read();
+	profile_pefromance(test_light_table_create);
+	profile_pefromance(test_light_table_find);
 
 	system("pause");
 	return 0;
