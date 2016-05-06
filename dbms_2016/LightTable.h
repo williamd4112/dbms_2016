@@ -14,6 +14,7 @@
 #define UNKNOWN_ATTR 0x5
 #define UNKNOWN_RELATION 0x6
 #define UNSUPPORT_RELATION 0x7
+#define UNSUPPORT_MERGE_TYPE 0x8
 
 std::ostream &operator <<(std::ostream &os, const AttrTuple tuple);
 
@@ -43,6 +44,12 @@ public:
 		LightTable &b,
 		std::string b_keyname,
 		std::vector<AddrPair> &match_pairs);
+
+	static void merge(
+		std::vector<AddrPair> &a,
+		merge_type_t merge_type, 
+		std::vector<AddrPair> &b,
+		std::vector<AddrPair> & c);
 
 	static void select(
 		LightTable &a,
@@ -106,7 +113,17 @@ private:
 		IndexFile *fix_index,
 		std::vector<AddrPair> &match_pairs);
 
-	static inline void join_merge(
+	static inline void join_tree_eq(
+		LightTable &a,
+		std::string a_keyname,
+		IndexFile *a_index,
+		relation_type_t rel_type,
+		LightTable &b,
+		std::string b_keyname,
+		IndexFile *b_index,
+		std::vector<AddrPair> &match_pairs);
+
+	static inline void join_tree_than(
 		LightTable &a,
 		std::string a_keyname,
 		IndexFile *a_index,

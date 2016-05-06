@@ -38,6 +38,11 @@ enum relation_type_t
 	EQ, NEQ, LESS, LARGE
 };
 
+enum merge_type_t
+{
+	AND, OR
+};
+
 enum attr_domain_t
 {
 	INTEGER_DOMAIN,

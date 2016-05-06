@@ -12,6 +12,13 @@ std::ostream &operator <<(std::ostream &os, const AttrTuple tuple)
 	return os;
 }
 
+bool operator <(const AddrPair & p1, const AddrPair & p2)
+{
+	if (p1.first == p2.first)
+		return p1.second < p2.second;
+	else
+		return p1.first < p2.first;
+}
 
 LightTable::LightTable()
 {
@@ -71,7 +78,7 @@ void LightTable::join(
 				rel_type, 
 				b, b_keyname, b_index_file, match_pairs);
 		else if ((a_stat & BIT_HAS_TREE) && (b_stat & BIT_HAS_TREE))
-			join_merge(a, a_keyname, a_index_file,
+			join_tree_eq(a, a_keyname, a_index_file,
 				rel_type,
 				b, b_keyname, b_index_file, match_pairs);
 		else
@@ -80,9 +87,22 @@ void LightTable::join(
 				b, b_keyname,
 				match_pairs);
 		break;
-	case LESS:
-		break;
-	case LARGE:
+	case LESS: case LARGE:
+		// 1. Two Tree
+		// 2. b has tree
+		// 3. Naive
+		if ((a_stat & BIT_HAS_TREE) && (b_stat & BIT_HAS_TREE))
+		{
+
+		}
+		else if (b_stat & BIT_HAS_TREE)
+		{
+
+		}
+		else
+		{
+
+		}
 		break;
 	default:
 		break;
@@ -447,11 +467,24 @@ inline void LightTable::hashjoin_not(
 	}
 }
 
-void LightTable::join_merge(
+void LightTable::join_tree_eq(
 	LightTable & a, std::string a_keyname, IndexFile * a_index,
 	relation_type_t rel_type, 
 	LightTable & b, std::string b_keyname, IndexFile * b_index,
 	std::vector<AddrPair> &match_pairs)
+{
+	assert(a_index != NULL && b_index != NULL);
+	
+	const TreeIndexFile *ta = static_cast<TreeIndexFile*>(a_index);
+	const TreeIndexFile *tb = static_cast<TreeIndexFile*>(b_index);
+	TreeIndexFile::merge_eq(*ta, *tb, match_pairs);
+}
+
+inline void LightTable::join_tree_than(
+	LightTable & a, std::string a_keyname, IndexFile * a_index, 
+	relation_type_t rel_type, 
+	LightTable & b, std::string b_keyname, IndexFile * b_index, 
+	std::vector<AddrPair>& match_pairs)
 {
 }
 
@@ -505,4 +538,32 @@ void LightTable::join_naive(
 			}
 		}
 	}
+}
+
+void LightTable::merge(
+	std::vector<AddrPair> & a,
+	merge_type_t merge_type, 
+	std::vector<AddrPair> & b,
+	std::vector<AddrPair> & c)
+{
+	std::sort(a.begin(), a.end());
+	std::sort(b.begin(), b.end());
+
+	std::vector<AddrPair>::iterator it;
+
+	c.resize(a.size() + b.size());
+
+	switch (merge_type)
+	{
+	case AND:
+		it = std::set_intersection(a.begin(), a.end(), b.begin(), b.end(), c.begin());
+		break;
+	case OR:
+		it = std::set_union(a.begin(), a.end(), b.begin(), b.end(), c.begin());
+		break;
+	default:
+		throw exception_t(UNSUPPORT_MERGE_TYPE, "Unsupported merge type.");
+	}
+	
+	c.resize(it - c.begin());
 }

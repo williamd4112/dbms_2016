@@ -1,5 +1,7 @@
 #include "IndexFile.h"
 
+#include "system.h"
+
 #include <iostream>
 #include <algorithm>
 
@@ -62,12 +64,24 @@ uint32_t HashIndexFile::get(const attr_t &attr_ref, const uint32_t fix_addr, std
 
 uint32_t HashIndexFile::get_not(const attr_t & attr_ref, std::vector<uint32_t>& match_addrs)
 {
-	return uint32_t();
+	for (auto it = mHashIndexTable.begin(); it != mHashIndexTable.end(); it++)
+	{
+		if (!(it->first == attr_ref))
+			match_addrs.push_back(it->second);
+	}
+
+	return match_addrs.size();
 }
 
 uint32_t HashIndexFile::get_not(const attr_t & attr_ref, const uint32_t fix_addr, std::vector<AddrPair>& match_pairs)
 {
-	return uint32_t();
+	for (auto it = mHashIndexTable.begin(); it != mHashIndexTable.end(); it++)
+	{
+		if (!(it->first == attr_ref))
+			match_pairs.emplace_back(fix_addr, it->second);
+	}
+
+	return match_pairs.size();
 }
 
 void HashIndexFile::write_back()
@@ -154,17 +168,10 @@ uint32_t PrimaryIndexFile::get(const attr_t & attr_ref, const uint32_t fix_addr,
 
 uint32_t PrimaryIndexFile::get_not(const attr_t & attr_ref, std::vector<uint32_t>& match_addrs)
 {
-	PrimaryIndexTable::iterator lowerbound = mPrimaryIndexTable.lower_bound(attr_ref);
-	PrimaryIndexTable::iterator upperbound = mPrimaryIndexTable.upper_bound(attr_ref);
-
-	for (auto it = mPrimaryIndexTable.begin(); it != lowerbound; it++)
+	for (auto it = mPrimaryIndexTable.begin(); it != mPrimaryIndexTable.end(); it++)
 	{
-		match_addrs.emplace_back(it->second);
-	}
-
-	for (auto it = ++upperbound; it != mPrimaryIndexTable.end(); it++)
-	{
-		match_addrs.emplace_back(it->second);
+		if (!(it->first == attr_ref))
+			match_addrs.push_back(it->second);
 	}
 
 	return match_addrs.size();
@@ -172,17 +179,10 @@ uint32_t PrimaryIndexFile::get_not(const attr_t & attr_ref, std::vector<uint32_t
 
 uint32_t PrimaryIndexFile::get_not(const attr_t & attr_ref, const uint32_t fix_addr, std::vector<AddrPair>& match_pairs)
 {
-	PrimaryIndexTable::iterator lowerbound = mPrimaryIndexTable.lower_bound(attr_ref);
-	PrimaryIndexTable::iterator upperbound = mPrimaryIndexTable.upper_bound(attr_ref);
-
-	for (auto it = mPrimaryIndexTable.begin(); it != lowerbound; it++)
+	for (auto it = mPrimaryIndexTable.begin(); it != mPrimaryIndexTable.end(); it++)
 	{
-		match_pairs.emplace_back(fix_addr, it->second);
-	}
-
-	for (auto it = upperbound; it != mPrimaryIndexTable.end(); it++)
-	{
-		match_pairs.emplace_back(fix_addr, it->second);
+		if (!(it->first == attr_ref))
+			match_pairs.emplace_back(fix_addr, it->second);
 	}
 
 	return match_pairs.size();
@@ -266,21 +266,6 @@ bool TreeIndexFile::set(const attr_t & attr_ref, const uint32_t record_addr)
 	return true;
 }
 
-uint32_t TreeIndexFile::get(const attr_t & attr_ref, std::vector<uint32_t>& match_addrs)
-{
-	auto result = mTreeIndexTable.equal_range(attr_ref);
-	if (result.first == result.second)
-		return 0;
-
-	uint32_t cnt = 0;
-	for (auto it = result.first; it != result.second; it++)
-	{
-		match_addrs.push_back(it->second);
-		cnt++;
-	}
-	return cnt;
-}
-
 uint32_t TreeIndexFile::get(const attr_t & attr_lower, const attr_t & attr_upper, std::vector<uint32_t>& match_addrs)
 {
 	TreeIndexTable::iterator begin = mTreeIndexTable.lower_bound(attr_lower);
@@ -288,61 +273,104 @@ uint32_t TreeIndexFile::get(const attr_t & attr_lower, const attr_t & attr_upper
 	if (begin == end)
 		return 0;
 
-	uint32_t cnt = 0;
-	for (auto it = begin; it != end; it++) 
-	{
-		match_addrs.push_back(it->second);
-		cnt++;
-	}
-	return cnt;
+	for (auto it = begin; it != end; it++)
+		match_addrs.emplace_back(it->second);
+	
+	return match_addrs.size();
 }
 
-uint32_t TreeIndexFile::get(const attr_t & attr_pivot, relation_type_t find_type, std::vector<uint32_t>& match_addrs)
+uint32_t TreeIndexFile::get(const attr_t & attr_ref, std::vector<uint32_t>& match_addrs)
 {
-	TreeIndexTable::iterator begin;
-	TreeIndexTable::iterator end;
-	
-	switch (find_type)
-	{
-	case EQ:
-		return get(attr_pivot, match_addrs);
-	case NEQ:
-		return 0;
-	case LESS:
-		begin = mTreeIndexTable.begin();
-		end = mTreeIndexTable.lower_bound(attr_pivot);
-		break;
-	case LARGE:
-		begin = mTreeIndexTable.upper_bound(attr_pivot);
-		end = mTreeIndexTable.end();
-		break;
-	default:
-		return 0;
-	}
+	auto range = mTreeIndexTable.equal_range(attr_ref);
+	TreeIndexTable::iterator begin = range.first;
+	TreeIndexTable::iterator end = range.second;
 
-	uint32_t cnt = 0;
 	for (auto it = begin; it != end; it++)
-	{
-		match_addrs.push_back(it->second);
-		cnt++;
-	}
-	return cnt;
+		match_addrs.emplace_back(it->second);
 	
+	return match_addrs.size();
 }
 
 uint32_t TreeIndexFile::get(const attr_t & attr_ref, const uint32_t fix_addr, std::vector<AddrPair>& match_pairs)
 {
-	return uint32_t();
+	auto range = mTreeIndexTable.equal_range(attr_ref);
+	TreeIndexTable::iterator begin = range.first;
+	TreeIndexTable::iterator end = range.second;
+
+	for (auto it = begin; it != end; it++)
+		match_pairs.emplace_back(fix_addr, it->second);
+
+	return match_pairs.size();
 }
 
 uint32_t TreeIndexFile::get_not(const attr_t & attr_ref, std::vector<uint32_t>& match_addrs)
 {
-	return uint32_t();
+	auto range = mTreeIndexTable.equal_range(attr_ref);
+	TreeIndexTable::iterator begin = range.first;
+	TreeIndexTable::iterator end = range.second;
+	
+	for (auto it = mTreeIndexTable.begin(); it != begin; it++)
+		match_addrs.emplace_back(it->second);
+	for (auto it = end; it != mTreeIndexTable.end(); it++)
+		match_addrs.emplace_back(it->second);
+
+	return match_addrs.size();
 }
 
 uint32_t TreeIndexFile::get_not(const attr_t & attr_ref, const uint32_t fix_addr, std::vector<AddrPair>& match_pairs)
 {
-	return uint32_t();
+	auto range = mTreeIndexTable.equal_range(attr_ref);
+	
+	TreeIndexTable::iterator begin = range.first;
+	TreeIndexTable::iterator end = range.second;
+	
+	for (auto it = mTreeIndexTable.begin(); it != begin; it++)
+		match_pairs.emplace_back(fix_addr, it->second);
+	
+	for (auto it = end; it != mTreeIndexTable.end(); it++)
+		match_pairs.emplace_back(fix_addr, it->second);
+	
+	return match_pairs.size();
+}
+
+uint32_t TreeIndexFile::get_less(const attr_t & attr_ref, std::vector<uint32_t>& match_addrs)
+{
+	TreeIndexTable::iterator begin = mTreeIndexTable.begin();
+	TreeIndexTable::iterator end = mTreeIndexTable.lower_bound(attr_ref);
+	for (auto it = begin; it != end; it++)
+		match_addrs.emplace_back(it->second);
+
+	return match_addrs.size();
+}
+
+uint32_t TreeIndexFile::get_less(const attr_t & attr_ref, const uint32_t fix_addr, std::vector<AddrPair>& match_pairs)
+{
+	TreeIndexTable::iterator begin = mTreeIndexTable.begin();
+	TreeIndexTable::iterator end = mTreeIndexTable.lower_bound(attr_ref);
+	for (auto it = mTreeIndexTable.begin(); it != begin; it++)
+		match_pairs.emplace_back(fix_addr, it->second);
+
+	return match_pairs.size();
+}
+
+uint32_t TreeIndexFile::get_large(const attr_t & attr_ref, std::vector<uint32_t>& match_addrs)
+{
+	TreeIndexTable::iterator begin = mTreeIndexTable.upper_bound(attr_ref);
+	TreeIndexTable::iterator end = mTreeIndexTable.end();
+	for (auto it = begin; it != end; it++)
+		match_addrs.emplace_back(it->second);
+
+	return match_addrs.size();
+}
+
+uint32_t TreeIndexFile::get_large(const attr_t & attr_ref, const uint32_t fix_addr, std::vector<AddrPair>& match_pairs)
+{
+	TreeIndexTable::iterator begin = mTreeIndexTable.upper_bound(attr_ref);
+	TreeIndexTable::iterator end = mTreeIndexTable.end();
+	for (auto it = mTreeIndexTable.begin(); it != begin; it++)
+		match_pairs.emplace_back(fix_addr, it->second);
+
+	return match_pairs.size();
 }
 
 void TreeIndexFile::write_back()
@@ -389,4 +417,29 @@ void TreeIndexFile::dump()
 	{
 		cout << it->first << " -> " << it->second << endl;
 	}
+}
+
+void TreeIndexFile::merge_eq(
+	const TreeIndexFile & a,
+	const TreeIndexFile & b, 
+	std::vector<AddrPair>& match_pairs)
+{
+	auto ait = a.mTreeIndexTable.begin();
+	auto bit = b.mTreeIndexTable.begin();
+	auto a_end = a.mTreeIndexTable.end();
+	auto b_end = b.mTreeIndexTable.end();
+
+	while (ait != a_end && bit != b_end)
+	{
+		if (ait->first == bit->first)
+		{
+			match_pairs.emplace_back(ait->second, bit->second);
+			ait++;
+			bit++;
+		}
+		else if (ait->first < bit->first)
+			ait++;
+		else
+			bit++;
+	}	
 }

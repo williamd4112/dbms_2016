@@ -5,6 +5,8 @@
 #include <cassert>
 #include <iostream>
 
+#define INDEX_UNKOWN_RELATION_TYPE 0x1
+
 enum IndexExceptionType
 {
 	INDEX_NOT_FOUND
@@ -83,16 +85,23 @@ public:
 	bool set(const attr_t &attr_ref, const uint32_t record_addr);
 	uint32_t get(const attr_t &attr_ref, std::vector<uint32_t> &match_addrs);
 	uint32_t get(const attr_t &attr_lower, const attr_t &attr_upper, std::vector<uint32_t> &match_addrs);
-	uint32_t get(const attr_t &attr_pivot, relation_type_t find_type, std::vector<uint32_t> &match_addrs);
 	uint32_t get(const attr_t &attr_ref, const uint32_t fix_addr, std::vector<AddrPair> &match_pairs);
 
 	uint32_t get_not(const attr_t &attr_ref, std::vector<uint32_t> &match_addrs);
 	uint32_t get_not(const attr_t &attr_ref, const uint32_t fix_addr, std::vector<AddrPair> &match_pairs);
 
+	uint32_t get_less(const attr_t &attr_ref, std::vector<uint32_t> &match_addrs);
+	uint32_t get_less(const attr_t &attr_ref, const uint32_t fix_addr, std::vector<AddrPair> &match_pairs);
+
+	uint32_t get_large(const attr_t &attr_ref, std::vector<uint32_t> &match_addrs);
+	uint32_t get_large(const attr_t &attr_ref, const uint32_t fix_addr, std::vector<AddrPair> &match_pairs);
+
 	void write_back();
 	void read_from();
 
 	void dump();
+
+	static void merge_eq(const TreeIndexFile &a, const TreeIndexFile &b, std::vector<AddrPair> &match_pairs);
 private:
 	TreeIndexTable mTreeIndexTable;
 };

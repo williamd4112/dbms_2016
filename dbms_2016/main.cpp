@@ -359,16 +359,18 @@ void test_lite_table_join()
 		{ "Grade", ATTR_TYPE_INTEGER, 54, 4, 0 }
 	};
 
-	table_attr_desc_t t2_descs[2] = {
+	table_attr_desc_t t2_descs[3] = {
 		{ "BookID", ATTR_TYPE_INTEGER, 0, 4, ATTR_CONSTRAINT_PRIMARY_KEY },
-		{ "BookName", ATTR_TYPE_VARCHAR, 4, 40, 0 }
+		{ "BookName", ATTR_TYPE_VARCHAR, 4, 40, 0 },
+		{ "BookGrade", ATTR_TYPE_VARCHAR, 44, 4, 0 }
 	};
 
 	t1.create("table1", t1_descs, 4);
+	t1.create_index("Grade", TREE);
 
 	AttrTuple t1_tuple(4);
 	char name[40], addr[40];
-	for (int i = 0; i < 4; i++)
+	for (int i = 0; i < 5; i++)
 	{
 		sprintf(name, "Name%d", i);
 		sprintf(addr, "Addr%d", i);
@@ -379,14 +381,16 @@ void test_lite_table_join()
 		t1.insert(t1_tuple);
 	}
 
-	AttrTuple t2_tuple(2);
+	AttrTuple t2_tuple(3);
 	char bookname[40];
-	t2.create("table2", t2_descs, 2);
-	for (int i = 0; i < 2; i++)
+	t2.create("table2", t2_descs, 3);
+	t2.create_index("BookGrade", TREE);
+	for (int i = 0; i < 10; i++)
 	{
-		sprintf(bookname, "Book%d", i);
+		sprintf(bookname, "Name%d", i % 10);
 		t2_tuple[0] = i;
 		t2_tuple[1] = bookname;
+		t2_tuple[2] = i * 10;
 		t2.insert(t2_tuple);
 	}
 }
@@ -408,17 +412,34 @@ void test_join_naive()
 
 void test_join_hash()
 {
-	const char *a_select[] = { "ID" };
-	const char *b_select[] = { "BookID", "BookName" };
-	std::vector<AddrPair> match_addrs;
+	const char *a_select[] = { "Name" , "Grade"};
+	const char *b_select[] = { "BookID", "BookName", "BookGrade" };
 
-	LightTable::join(t1, "ID", NEQ, t2, "BookID", match_addrs);
+	std::vector<AddrPair> match_addrs_id;
+	std::vector<AddrPair> match_addrs_name;
+	std::vector<AddrPair> matchs;
+
+	LightTable::join(t1, "Grade", EQ, t2, "BookGrade", match_addrs_id);
+	//LightTable::join(t1, "Name", EQ, t2, "BookName", match_addrs_name);
+	//LightTable::merge(match_addrs_id, AND, match_addrs_name, matchs);
+
 	LightTable::select(
-		t1, std::vector<std::string>(a_select, a_select + 1),
-		t2, std::vector<std::string>(b_select, b_select + 2),
-		match_addrs);
-}
+		t1, std::vector<std::string>(a_select, a_select + 2),
+		t2, std::vector<std::string>(b_select, b_select + 3),
+		match_addrs_id);
+	printf("\n");
 
+	//LightTable::select(
+	//	t1, std::vector<std::string>(a_select, a_select + 2),
+	//	t2, std::vector<std::string>(b_select, b_select + 2),
+	//	match_addrs_name);
+	//printf("\n");
+
+	//LightTable::select(
+	//	t1, std::vector<std::string>(a_select, a_select + 2),
+	//	t2, std::vector<std::string>(b_select, b_select + 2),
+	//	matchs);
+}
 
 static Database<PAGESIZE_8K> database("database.dbs");
 
@@ -431,7 +452,7 @@ int main(int argc, char *argv[])
 	//printf("Insertion done\n");
 	test_lite_table_join();
 	profile_pefromance(test_join_hash);
-	profile_pefromance(test_join_naive);
+	//profile_pefromance(test_join_naive);
 	
 	system("pause");
 	return 0;
