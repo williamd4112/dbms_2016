@@ -116,6 +116,8 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
+      <AdditionalIncludeDirectories>C:\Users\williamd\Documents\Visual Studio 2015\Projects\sqlparser-master\Project1\Project1;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -131,15 +133,20 @@
     <ClCompile Include="..\..\sqlparser-master\Project1\Project1\sql\destruct.cpp" />
     <ClCompile Include="..\..\sqlparser-master\Project1\Project1\sql\Expr.cpp" />
     <ClCompile Include="Bit.cpp" />
+    <ClCompile Include="BooleanParser.cpp" />
     <ClCompile Include="ChainHashIndex.cpp" />
     <ClCompile Include="Condition.cpp" />
     <ClCompile Include="Database.cpp" />
     <ClCompile Include="DatabaseFile.cpp" />
+    <ClCompile Include="database_type.cpp" />
     <ClCompile Include="database_util.cpp" />
     <ClCompile Include="DiskFile.cpp" />
     <ClCompile Include="FileUtil.cpp" />
+    <ClCompile Include="From.cpp" />
     <ClCompile Include="HashIndexFile.cpp" />
     <ClCompile Include="IndexFile.cpp" />
+    <ClCompile Include="LightTable.cpp" />
+    <ClCompile Include="LightTableFile.cpp" />
     <ClCompile Include="PageFreeMapFile.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="DataPage.cpp" />
@@ -147,6 +154,8 @@
     <ClCompile Include="Record.cpp" />
     <ClCompile Include="RecordFile.cpp" />
     <ClCompile Include="RecordTable.cpp" />
+    <ClCompile Include="Select.cpp" />
+    <ClCompile Include="SequenceFile.cpp" />
     <ClCompile Include="system.cpp" />
     <ClCompile Include="TableFile.cpp" />
     <ClCompile Include="test.cpp" />
@@ -169,6 +178,11 @@
     <ClInclude Include="..\Project1\Project1\sql\Table.h" />
     <ClInclude Include="BinaryObject.h" />
     <ClInclude Include="Bit.h" />
+    <ClInclude Include="database_table_type.h" />
+    <ClInclude Include="LightTable.h" />
+    <ClInclude Include="LightTableFile.h" />
+    <ClInclude Include="SequenceFile.h" />
+    <ClInclude Include="SQLExprParser.h" />
     <ClInclude Include="ChainHashIndex.h" />
     <ClInclude Include="Condition.h" />
     <ClInclude Include="Database.h" />
@@ -176,6 +190,7 @@
     <ClInclude Include="database_type.h" />
     <ClInclude Include="database_util.h" />
     <ClInclude Include="DiskFile.h" />
+    <ClInclude Include="Execution.h" />
     <ClInclude Include="FileUtil.h" />
     <ClInclude Include="DataPage.h" />
     <ClInclude Include="BitmapPageFreeMapFile.h" />

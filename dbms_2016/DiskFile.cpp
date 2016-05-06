@@ -16,7 +16,13 @@ DiskFile::~DiskFile()
 bool DiskFile::open(const char *filepath, const char *mode)
 {
 	mFile = fopen(filepath, mode);
+	mFilepath = filepath;
 	return mFile != NULL;
+}
+
+std::string DiskFile::get_filepath()
+{
+	return mFilepath;
 }
 
 inline bool DiskFile::close()

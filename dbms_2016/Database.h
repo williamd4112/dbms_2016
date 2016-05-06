@@ -6,6 +6,7 @@
 #include "FileUtil.h"
 #include "database_util.h"
 #include "QueryExecution.h"
+#include "Execution.h"
 #include <unordered_map>
 #include <stack>
 
@@ -74,20 +75,22 @@ inline void Database<PAGESIZE>::execute(std::string &query)
 			{
 			case sql::kStmtSelect:
 			{
-				try
-				{
-					printf("-----------------------------------------------------------\n");
-					QueryExecution<PAGESIZE> exec(mDatabaseFile);
-					exec.execute(stmt);
-				}
-				catch (QueryException e)
-				{
-					exec_error_handler(e);
-				}
-				catch (db::DatabaseUtilException e)
-				{
-					db_error_handler(e);
-				}
+				//try
+				//{
+				//	printf("-----------------------------------------------------------\n");
+				//	QueryExecution<PAGESIZE> exec(mDatabaseFile);
+				//	exec.execute(stmt);
+				//}
+				//catch (QueryException e)
+				//{
+				//	exec_error_handler(e);
+				//}
+				//catch (db::DatabaseUtilException e)
+				//{
+				//	db_error_handler(e);
+				//}
+				SelectStatement *select_stmt = (SelectStatement*)stmt;
+				From<PAGESIZE_8K> from(mDatabaseFile, select_stmt->fromTable);
 				break;
 			}
 			case sql::kStmtInsert:

@@ -39,7 +39,7 @@ public:
 	~IndexFile();
 
 	virtual bool set(const attr_t &attr_ref, const uint32_t record_addr) = 0;
-	virtual bool get(const attr_t &attr_ref, std::vector<uint32_t> &match_addrs) = 0;
+	virtual uint32_t get(const attr_t &attr_ref, std::vector<uint32_t> &match_addrs) = 0;
 
 	const IndexType type() const { return mType; }
 protected:
@@ -57,7 +57,7 @@ public:
 	~HashIndexFile();
 
 	bool set(const attr_t &attr_ref, const uint32_t record_addr);
-	bool get(const attr_t &attr_ref, std::vector<uint32_t> &match_addrs);
+	uint32_t get(const attr_t &attr_ref, std::vector<uint32_t> &match_addrs);
 
 	void write_back();
 	void read_from();
@@ -75,8 +75,9 @@ public:
 	~TreeIndexFile();
 
 	bool set(const attr_t &attr_ref, const uint32_t record_addr);
-	bool get(const attr_t &attr_ref, std::vector<uint32_t> &match_addrs);
-	bool get(const attr_t &attr_lower, const attr_t &attr_upper, std::vector<uint32_t> &match_addrs);
+	uint32_t get(const attr_t &attr_ref, std::vector<uint32_t> &match_addrs);
+	uint32_t get(const attr_t &attr_lower, const attr_t &attr_upper, std::vector<uint32_t> &match_addrs);
+	uint32_t get(const attr_t &attr_pivot, FindType find_type, std::vector<uint32_t> &match_addrs);
 
 	void write_back();
 	void read_from();
@@ -94,8 +95,9 @@ public:
 	~PrimaryIndexFile();
 
 	bool set(const attr_t &attr_ref, const uint32_t record_addr);
-	bool get(const attr_t &attr_ref, std::vector<uint32_t> &match_addrs);
+	uint32_t get(const attr_t &attr_ref, std::vector<uint32_t> &match_addrs);
 	bool get_primary(const attr_t &attr_ref, uint32_t *match_addr);
+	bool isExist(const attr_t &attr_ref);
 
 	void write_back();
 	void read_from();

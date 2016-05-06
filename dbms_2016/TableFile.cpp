@@ -2,12 +2,12 @@
 #include "FileUtil.h"
 #include "system.h"
 #include "database_util.h"
+#include "database_type.h"
 
 #include <cassert>
 
 typedef std::pair<std::string, AttrRecord> attr_name_desc_pair;
 
-const char *kAttrTypeNames[] = {"NULL", "INTEGER", "VARCHAR"};
 
 TableFile::TableFile()
 	: mHeader{"null", 0, 0, -1},
@@ -102,6 +102,7 @@ void TableFile::init(const char *name, unsigned int num, table_attr_desc_t *pDes
 		mHeader.rowsize += mAttrDescs[i].size;
 	}
 	build_lookup_table();
+	build_primary_key_index(name);
 }
 
 void TableFile::init(const char *name, unsigned int num, table_attr_desc_t *pDescs)
@@ -131,6 +132,8 @@ void TableFile::init(const char *name, unsigned int num, table_attr_desc_t *pDes
 		mHeader.rowsize += mAttrDescs[i].size;
 	}
 	build_lookup_table();
+	build_primary_key_index(name);
+
 }
 
 void TableFile::init(const char *name, std::vector<sql::ColumnDefinition*>& col_defs)
@@ -173,9 +176,7 @@ void TableFile::init(const char *name, std::vector<sql::ColumnDefinition*>& col_
 	build_lookup_table();
 	
 	// build primary index
-	char buff[INDEX_FILENAME_MAX];
-	sprintf(buff, "%s_pk.idx", name);
-	init_index(mAttrDescs[mHeader.primaryKeyIndex].name, buff, PHASH);
+	build_primary_key_index(name);
 }
 
 uint8_t TableFile::init_index(const char * attr_name, const char * index_filename, IndexType index_type)
@@ -312,6 +313,14 @@ inline void TableFile::build_lookup_table()
 		// No duplicated attribute here, should check at top first, not here
 		assert(result.second);
 	}
+}
+
+inline void TableFile::build_primary_key_index(const char *name)
+{
+	// build primary index
+	char buff[INDEX_FILENAME_MAX];
+	sprintf(buff, "%s_pk.idx", name);
+	init_index(mAttrDescs[mHeader.primaryKeyIndex].name, buff, PHASH);
 }
 
 inline IndexFile * TableFile::allocate_index_file(const table_attr_desc_t * desc, IndexType type)

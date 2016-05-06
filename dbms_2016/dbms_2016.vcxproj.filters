@@ -96,6 +96,27 @@
     <ClCompile Include="HashIndexFile.cpp">
       <Filter>原始程式檔</Filter>
     </ClCompile>
+    <ClCompile Include="Select.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="From.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="BooleanParser.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="SequenceFile.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="LightTableFile.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="database_type.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="LightTable.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="FileUtil.h">
@@ -201,6 +222,24 @@
       <Filter>標頭檔</Filter>
     </ClInclude>
     <ClInclude Include="database_type.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="Execution.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="SQLExprParser.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="SequenceFile.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="LightTableFile.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="LightTable.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="database_table_type.h">
       <Filter>標頭檔</Filter>
     </ClInclude>
   </ItemGroup>

@@ -210,3 +210,5 @@ FakesAssemblies/
 GeneratedArtifacts/
 _Pvt_Extensions/
 ModelManifest.xml
+/dbms_2016.VC.db
+/dbms_2016.VC.VC.opendb
