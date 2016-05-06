@@ -443,3 +443,15 @@ void TreeIndexFile::merge_eq(
 			bit++;
 	}	
 }
+
+void TreeIndexFile::merge_neq(const TreeIndexFile & a, const TreeIndexFile & b, std::vector<AddrPair>& match_pairs)
+{
+	for (auto it = a.mTreeIndexTable.begin(); it != a.mTreeIndexTable.end(); it++)
+	{
+		auto eq_range = b.mTreeIndexTable.equal_range(it->first);
+		for (auto nit = b.mTreeIndexTable.begin(); nit != eq_range.first; nit++)
+			match_pairs.emplace_back(it->second, nit->second);
+		for (auto nit = eq_range.second; nit != b.mTreeIndexTable.end(); nit++)
+			match_pairs.emplace_back(it->second, nit->second);
+	}
+}

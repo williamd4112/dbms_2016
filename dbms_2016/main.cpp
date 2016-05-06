@@ -370,7 +370,7 @@ void test_lite_table_join()
 
 	AttrTuple t1_tuple(4);
 	char name[40], addr[40];
-	for (int i = 0; i < 5; i++)
+	for (int i = 0; i < 10; i++)
 	{
 		sprintf(name, "Name%d", i);
 		sprintf(addr, "Addr%d", i);
@@ -385,7 +385,7 @@ void test_lite_table_join()
 	char bookname[40];
 	t2.create("table2", t2_descs, 3);
 	t2.create_index("BookGrade", TREE);
-	for (int i = 0; i < 10; i++)
+	for (int i = 0; i < 100; i++)
 	{
 		sprintf(bookname, "Name%d", i % 10);
 		t2_tuple[0] = i;
@@ -413,7 +413,7 @@ void test_join_naive()
 void test_join_hash()
 {
 	const char *a_select[] = { "Name" , "Grade"};
-	const char *b_select[] = { "BookID", "BookName", "BookGrade" };
+	const char *b_select[] = { "BookID", "BookGrade" };
 
 	std::vector<AddrPair> match_addrs_id;
 	std::vector<AddrPair> match_addrs_name;
@@ -425,7 +425,7 @@ void test_join_hash()
 
 	LightTable::select(
 		t1, std::vector<std::string>(a_select, a_select + 2),
-		t2, std::vector<std::string>(b_select, b_select + 3),
+		t2, std::vector<std::string>(b_select, b_select + 2),
 		match_addrs_id);
 	printf("\n");
 

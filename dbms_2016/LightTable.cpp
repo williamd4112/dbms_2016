@@ -477,7 +477,22 @@ void LightTable::join_tree_eq(
 	
 	const TreeIndexFile *ta = static_cast<TreeIndexFile*>(a_index);
 	const TreeIndexFile *tb = static_cast<TreeIndexFile*>(b_index);
-	TreeIndexFile::merge_eq(*ta, *tb, match_pairs);
+	
+	switch (rel_type)
+	{
+	case EQ:
+		TreeIndexFile::merge_eq(*ta, *tb, match_pairs);
+		break;
+	case NEQ:
+		TreeIndexFile::merge_neq(*ta, *tb, match_pairs);
+		break;
+	case LESS:
+		break;
+	case LARGE:
+		break;
+	default:
+		break;
+	}
 }
 
 inline void LightTable::join_tree_than(

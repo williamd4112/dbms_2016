@@ -102,6 +102,7 @@ public:
 	void dump();
 
 	static void merge_eq(const TreeIndexFile &a, const TreeIndexFile &b, std::vector<AddrPair> &match_pairs);
+	static void merge_neq(const TreeIndexFile &a, const TreeIndexFile &b, std::vector<AddrPair> &match_pairs);
 private:
 	TreeIndexTable mTreeIndexTable;
 };
