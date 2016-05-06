@@ -12,6 +12,7 @@
 #define JOIN_UNKNOWN_RELATION_TYPE 0x3
 #define FIND_NOT_FOUND 0x4
 #define UNKNOWN_ATTR 0x5
+#define UNKNOWN_RELATION 0x6
 
 typedef std::vector<attr_t> AttrTuple;
 typedef std::vector<AttrTuple>::iterator AttrTupleIterator;

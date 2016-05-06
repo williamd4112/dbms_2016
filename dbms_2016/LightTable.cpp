@@ -190,6 +190,12 @@ void LightTable::insert(AttrTuple & tuple)
 	update_index(tuple, addr);
 }
 
+/*
+	LightTable::find()
+	
+	if specified attribute has index, use index to find all matched addrs
+	if not, use exhaustive search to find all matched addrs
+*/
 uint32_t LightTable::find(
 	const char * attr_name, 
 	attr_t &attr, 
@@ -301,6 +307,7 @@ uint32_t LightTable::find_with_index(
 		match_num = index_file->get(attr, match_addrs);
 		break;
 	case NEQ:
+		assert(false);
 		break;
 	case LESS: 
 		{
@@ -317,7 +324,7 @@ uint32_t LightTable::find_with_index(
 		}
 		break;
 	default:
-		break;
+		throw exception_t(UNKNOWN_RELATION, "Unknown relation type");
 	}
 
 	return match_num;
