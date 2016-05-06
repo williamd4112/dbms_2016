@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <unordered_map>
+#include <unordered_set>
 #include <map>
 #include <vector>
 #include <iostream>
@@ -28,6 +29,9 @@
 #define INDEX_RECORD_SIZE_MAX 255
 
 extern const char *kAttrTypeNames[];
+
+template <class T, class HashType>
+using HashSet = std::unordered_set<T, HashType>;
 
 enum relation_type_t
 {
@@ -179,4 +183,15 @@ struct attr_t_hash {
 			return std::hash<std::string>{}(attr.Varchar());
 	}
 };
+
+typedef std::vector<attr_t> AttrTuple;
+typedef std::vector<AttrTuple>::iterator AttrTupleIterator;
+typedef std::pair<uint32_t, uint32_t> AddrPair;
+
+struct addr_pair_hash {
+	size_t operator() (const AddrPair &addr_pair) const {
+		return std::hash<uint32_t>{}(addr_pair.first) ^ std::hash<uint32_t>{}(addr_pair.second);
+	}
+};
+
 

@@ -40,13 +40,15 @@ public:
 
 	virtual bool set(const attr_t &attr_ref, const uint32_t record_addr) = 0;
 	virtual uint32_t get(const attr_t &attr_ref, std::vector<uint32_t> &match_addrs) = 0;
+	virtual uint32_t get(const attr_t &attr_ref, const uint32_t fix_addr, std::vector<AddrPair> &match_pairs) = 0;
+	virtual uint32_t get_not(const attr_t &attr_ref, std::vector<uint32_t> &match_addrs) = 0;
+	virtual uint32_t get_not(const attr_t &attr_ref, const uint32_t fix_addr, std::vector<AddrPair> &match_pairs) = 0;
 
 	const IndexType type() const { return mType; }
 protected:
 	IndexType mType;
 	attr_domain_t mKeydomain;
 	uint32_t mKeysize;
-
 };
 
 class HashIndexFile
@@ -58,6 +60,10 @@ public:
 
 	bool set(const attr_t &attr_ref, const uint32_t record_addr);
 	uint32_t get(const attr_t &attr_ref, std::vector<uint32_t> &match_addrs);
+	uint32_t get(const attr_t &attr_ref, const uint32_t fix_addr, std::vector<AddrPair> &match_pairs);
+
+	uint32_t get_not(const attr_t &attr_ref, std::vector<uint32_t> &match_addrs);
+	uint32_t get_not(const attr_t &attr_ref, const uint32_t fix_addr, std::vector<AddrPair> &match_pairs);
 
 	void write_back();
 	void read_from();
@@ -78,6 +84,10 @@ public:
 	uint32_t get(const attr_t &attr_ref, std::vector<uint32_t> &match_addrs);
 	uint32_t get(const attr_t &attr_lower, const attr_t &attr_upper, std::vector<uint32_t> &match_addrs);
 	uint32_t get(const attr_t &attr_pivot, relation_type_t find_type, std::vector<uint32_t> &match_addrs);
+	uint32_t get(const attr_t &attr_ref, const uint32_t fix_addr, std::vector<AddrPair> &match_pairs);
+
+	uint32_t get_not(const attr_t &attr_ref, std::vector<uint32_t> &match_addrs);
+	uint32_t get_not(const attr_t &attr_ref, const uint32_t fix_addr, std::vector<AddrPair> &match_pairs);
 
 	void write_back();
 	void read_from();
@@ -96,6 +106,11 @@ public:
 
 	bool set(const attr_t &attr_ref, const uint32_t record_addr);
 	uint32_t get(const attr_t &attr_ref, std::vector<uint32_t> &match_addrs);
+	uint32_t get(const attr_t &attr_ref, const uint32_t fix_addr, std::vector<AddrPair> &match_pairs);
+
+	uint32_t get_not(const attr_t &attr_ref, std::vector<uint32_t> &match_addrs);
+	uint32_t get_not(const attr_t &attr_ref, const uint32_t fix_addr, std::vector<AddrPair> &match_pairs);
+
 	bool get_primary(const attr_t &attr_ref, uint32_t *match_addr);
 	bool isExist(const attr_t &attr_ref);
 

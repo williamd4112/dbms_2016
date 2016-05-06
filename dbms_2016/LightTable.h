@@ -13,10 +13,7 @@
 #define FIND_NOT_FOUND 0x4
 #define UNKNOWN_ATTR 0x5
 #define UNKNOWN_RELATION 0x6
-
-typedef std::vector<attr_t> AttrTuple;
-typedef std::vector<AttrTuple>::iterator AttrTupleIterator;
-typedef std::pair<uint32_t, uint32_t> AddrPair;
+#define UNSUPPORT_RELATION 0x7
 
 std::ostream &operator <<(std::ostream &os, const AttrTuple tuple);
 
@@ -32,6 +29,14 @@ public:
 	~LightTable();
 
 	static void join(
+		LightTable &a,
+		std::string a_keyname,
+		relation_type_t rel_type,
+		LightTable &b,
+		std::string b_keyname,
+		std::vector<AddrPair> &match_pairs);
+
+	static void join_naive(
 		LightTable &a,
 		std::string a_keyname,
 		relation_type_t rel_type,
@@ -56,6 +61,8 @@ public:
 	uint32_t find(const char *attr_name, attr_t & attr, relation_type_t find_type, std::vector<uint32_t> & match_addrs);
 	
 	AttrTuple &get_tuple(uint32_t index);
+	int get_attr_id(std::string attr_name);
+	uint32_t size();
 
 	void dump();
 
@@ -75,32 +82,38 @@ private:
 	inline void init_seq_types(AttrDesc *descs, int num);
 	void get_selectid_from_names(std::vector<std::string> &names, std::vector<int> &ids);
 
-	static void join_hash(
+	static inline void join_hash(
 		LightTable &a,
 		std::string a_keyname,
-		IndexFile &a_index,
+		IndexFile *a_index,
 		relation_type_t rel_type,
 		LightTable &b,
 		std::string b_keyname,
-		IndexFile &b_index,
+		IndexFile *b_index,
+		std::vector<AddrPair> &match_pairs);
+	
+	static inline void hashjoin(
+		LightTable *iter_table,
+		int iter_key_id,
+		LightTable *fix_table,
+		IndexFile *fix_index,
 		std::vector<AddrPair> &match_pairs);
 
-	static void join_merge(
-		LightTable &a,
-		std::string a_keyname,
-		IndexFile &a_index,
-		relation_type_t rel_type,
-		LightTable &b,
-		std::string b_keyname,
-		IndexFile &b_index,
+	static inline void hashjoin_not(
+		LightTable *iter_table,
+		int iter_key_id,
+		LightTable *fix_table,
+		IndexFile *fix_index,
 		std::vector<AddrPair> &match_pairs);
 
-	static void join_naive(
+	static inline void join_merge(
 		LightTable &a,
 		std::string a_keyname,
+		IndexFile *a_index,
 		relation_type_t rel_type,
 		LightTable &b,
 		std::string b_keyname,
+		IndexFile *b_index,
 		std::vector<AddrPair> &match_pairs);
 };
 

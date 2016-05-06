@@ -353,14 +353,14 @@ void test_light_table_find()
 void test_lite_table_join()
 {
 	table_attr_desc_t t1_descs[4] = {
-		{ "ID", ATTR_TYPE_INTEGER, 0, 4, 0 },
+		{ "ID", ATTR_TYPE_INTEGER, 0, 4, ATTR_CONSTRAINT_PRIMARY_KEY},
 		{ "Name", ATTR_TYPE_VARCHAR, 4, 40, 0 },
 		{ "Addr", ATTR_TYPE_VARCHAR, 44, 10, 0 },
 		{ "Grade", ATTR_TYPE_INTEGER, 54, 4, 0 }
 	};
 
 	table_attr_desc_t t2_descs[2] = {
-		{ "BookID", ATTR_TYPE_INTEGER, 0, 4, 0 },
+		{ "BookID", ATTR_TYPE_INTEGER, 0, 4, ATTR_CONSTRAINT_PRIMARY_KEY },
 		{ "BookName", ATTR_TYPE_VARCHAR, 4, 40, 0 }
 	};
 
@@ -368,7 +368,7 @@ void test_lite_table_join()
 
 	AttrTuple t1_tuple(4);
 	char name[40], addr[40];
-	for (int i = 0; i < 1000; i++)
+	for (int i = 0; i < 4; i++)
 	{
 		sprintf(name, "Name%d", i);
 		sprintf(addr, "Addr%d", i);
@@ -382,7 +382,7 @@ void test_lite_table_join()
 	AttrTuple t2_tuple(2);
 	char bookname[40];
 	t2.create("table2", t2_descs, 2);
-	for (int i = 0; i < 1000; i++)
+	for (int i = 0; i < 2; i++)
 	{
 		sprintf(bookname, "Book%d", i);
 		t2_tuple[0] = i;
@@ -392,14 +392,33 @@ void test_lite_table_join()
 }
 
 
-void test_join()
+void test_join_naive()
 {
 	const char *a_select[] = { "ID" };
 	const char *b_select[] = { "BookID", "BookName" };
 	std::vector<AddrPair> match_addrs;
 
-	LightTable::join(t1, "ID", EQ, t2, "BookID", match_addrs);
+	LightTable::join_naive(t1, "ID", NEQ, t2, "BookID", match_addrs);
+
+	LightTable::select(
+		t1, std::vector<std::string>(a_select, a_select + 1),
+		t2, std::vector<std::string>(b_select, b_select + 2),
+		match_addrs);
 }
+
+void test_join_hash()
+{
+	const char *a_select[] = { "ID" };
+	const char *b_select[] = { "BookID", "BookName" };
+	std::vector<AddrPair> match_addrs;
+
+	LightTable::join(t1, "ID", NEQ, t2, "BookID", match_addrs);
+	LightTable::select(
+		t1, std::vector<std::string>(a_select, a_select + 1),
+		t2, std::vector<std::string>(b_select, b_select + 2),
+		match_addrs);
+}
+
 
 static Database<PAGESIZE_8K> database("database.dbs");
 
@@ -409,9 +428,11 @@ static Database<PAGESIZE_8K> database("database.dbs");
 */
 int main(int argc, char *argv[])
 {
+	//printf("Insertion done\n");
 	test_lite_table_join();
-	profile_pefromance(test_join);
-
+	profile_pefromance(test_join_hash);
+	profile_pefromance(test_join_naive);
+	
 	system("pause");
 	return 0;
 

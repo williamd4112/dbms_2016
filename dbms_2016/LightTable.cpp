@@ -62,25 +62,23 @@ void LightTable::join(
 	// According to relation type, choose best approach
 	switch (rel_type)
 	{
-	case EQ:
-		// 1. Hash join (if two, choose small one to iterate)
+	case EQ: case NEQ:
+		// 1. Hash join (always use a as iter_table, b as index_table)
 		// 2. Tree join
 		// 3. Naive
-		if ((a_stat & BIT_HAS_HASH) || (b_stat & BIT_HAS_HASH))
-			join_hash(a, a_keyname, *a_index_file, 
+		if ((b_stat & BIT_HAS_HASH))
+			join_hash(a, a_keyname, a_index_file, 
 				rel_type, 
-				b, b_keyname, *b_index_file, match_pairs);
+				b, b_keyname, b_index_file, match_pairs);
 		else if ((a_stat & BIT_HAS_TREE) && (b_stat & BIT_HAS_TREE))
-			join_merge(a, a_keyname, *a_index_file,
+			join_merge(a, a_keyname, a_index_file,
 				rel_type,
-				b, b_keyname, *b_index_file, match_pairs);
+				b, b_keyname, b_index_file, match_pairs);
 		else
 			join_naive(a, a_keyname,
 				rel_type,
 				b, b_keyname,
 				match_pairs);
-		break;
-	case NEQ:
 		break;
 	case LESS:
 		break;
@@ -233,6 +231,20 @@ AttrTuple & LightTable::get_tuple(uint32_t index)
 	return mDatafile.get(index);
 }
 
+int LightTable::get_attr_id(std::string attr_name)
+{
+	int key_id = mTablefile.get_attr_id(attr_name.c_str());
+
+	if (key_id < 0)
+		throw exception_t(UNKNOWN_ATTR, attr_name.c_str());
+	return key_id;
+}
+
+uint32_t LightTable::size()
+{
+	return mDatafile.size();
+}
+
 void LightTable::dump()
 {
 	mTablefile.dump_info();
@@ -373,18 +385,72 @@ void LightTable::get_selectid_from_names(std::vector<std::string>& names, std::v
 	}
 }
 
-void LightTable::join_hash(
-	LightTable & a, std::string a_keyname, IndexFile & a_index,
+/*
+	join_hash
+
+	always use a to index, b to iter
+
+*/
+inline void LightTable::join_hash(
+	LightTable & a, std::string a_keyname, IndexFile * a_index,
 	relation_type_t rel_type, 
-	LightTable & b, std::string b_keyname, IndexFile & b_index,
+	LightTable & b, std::string b_keyname, IndexFile * b_index,
 	std::vector<AddrPair> &match_pairs)
 {
+	assert(rel_type == EQ || rel_type == NEQ);
+
+	int a_key_id = a.get_attr_id(a_keyname.c_str());
+	int b_key_id = b.get_attr_id(b_keyname.c_str());
+
+	switch (rel_type)
+	{
+	case EQ:
+		hashjoin(&a, a_key_id, &b, b_index, match_pairs);
+		break;
+	case NEQ:
+		hashjoin_not(&a, a_key_id, &b, b_index, match_pairs);
+		break;
+	default:
+		assert(false); // Hash index only support EQ, NEQ
+	}
+}
+
+inline void LightTable::hashjoin(
+	LightTable *iter_table,
+	int iter_key_id,
+	LightTable *fix_table, 
+	IndexFile * fix_index, 
+	std::vector<AddrPair>& match_pairs)
+{
+	for (auto it = iter_table->begin(); it != iter_table->end(); it++)
+	{
+		uint32_t iter_addr = it - iter_table->begin();
+		attr_t & iter_key_attr = it->at(iter_key_id);
+
+		fix_index->get(iter_key_attr, iter_addr, match_pairs);
+	}
+}
+
+inline void LightTable::hashjoin_not(
+	LightTable * iter_table,
+	int iter_key_id, 
+	LightTable * fix_table, 
+	IndexFile * fix_index, 
+	std::vector<AddrPair>& match_pairs)
+{
+	for (auto it = iter_table->begin(); it != iter_table->end(); it++)
+	{
+		uint32_t iter_addr = it - iter_table->begin();
+		attr_t & iter_key_attr = it->at(iter_key_id);
+
+		fix_index->get_not(iter_key_attr, iter_addr, match_pairs);
+	}
 }
 
 void LightTable::join_merge(
-	LightTable & a, std::string a_keyname, IndexFile & a_index,
+	LightTable & a, std::string a_keyname, IndexFile * a_index,
 	relation_type_t rel_type, 
-	LightTable & b, std::string b_keyname, IndexFile & b_index,
+	LightTable & b, std::string b_keyname, IndexFile * b_index,
 	std::vector<AddrPair> &match_pairs)
 {
 }
@@ -420,7 +486,7 @@ void LightTable::join_naive(
 			{
 			case EQ:
 				if (ait->at(a_key_id) == bit->at(b_key_id))
-					match_pairs.push_back({a_id, b_id});
+					match_pairs.push_back({ a_id, b_id});
 				break;
 			case NEQ:
 				if (!(ait->at(a_key_id) == bit->at(b_key_id)))

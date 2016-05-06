@@ -41,6 +41,7 @@ public:
 
 	TupleIterator begin() { return mTuples.begin(); }
 	TupleIterator end() { return mTuples.end(); }
+	uint32_t size() { return mTuples.size(); }
 
 	inline void write_back();
 	inline void read_from();

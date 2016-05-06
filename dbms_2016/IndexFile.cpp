@@ -45,6 +45,31 @@ uint32_t HashIndexFile::get(const attr_t &attr_ref, std::vector<uint32_t> &match
 	return cnt;
 }
 
+uint32_t HashIndexFile::get(const attr_t &attr_ref, const uint32_t fix_addr, std::vector<AddrPair> &match_pairs)
+{
+	auto result = mHashIndexTable.equal_range(attr_ref);
+	if (result.first == result.second)
+		return 0;
+
+	uint32_t cnt = 0;
+	for (auto it = result.first; it != result.second; it++)
+	{
+		match_pairs.emplace_back(fix_addr, it->second);
+		cnt++;
+	}
+	return cnt;
+}
+
+uint32_t HashIndexFile::get_not(const attr_t & attr_ref, std::vector<uint32_t>& match_addrs)
+{
+	return uint32_t();
+}
+
+uint32_t HashIndexFile::get_not(const attr_t & attr_ref, const uint32_t fix_addr, std::vector<AddrPair>& match_pairs)
+{
+	return uint32_t();
+}
+
 void HashIndexFile::write_back()
 {
 	assert(mKeydomain != UNDEFINED_DOMAIN && mFile != NULL);
@@ -114,6 +139,53 @@ uint32_t PrimaryIndexFile::get(const attr_t & attr_ref, std::vector<uint32_t>& m
 		return true;
 	}
 	return false;
+}
+
+uint32_t PrimaryIndexFile::get(const attr_t & attr_ref, const uint32_t fix_addr, std::vector<AddrPair>& match_pairs)
+{
+	auto res = mPrimaryIndexTable.find(attr_ref);
+	if (res != mPrimaryIndexTable.end())
+	{
+		match_pairs.emplace_back(fix_addr, res->second);
+		return 1;
+	}
+	return 0;
+}
+
+uint32_t PrimaryIndexFile::get_not(const attr_t & attr_ref, std::vector<uint32_t>& match_addrs)
+{
+	PrimaryIndexTable::iterator lowerbound = mPrimaryIndexTable.lower_bound(attr_ref);
+	PrimaryIndexTable::iterator upperbound = mPrimaryIndexTable.upper_bound(attr_ref);
+
+	for (auto it = mPrimaryIndexTable.begin(); it != lowerbound; it++)
+	{
+		match_addrs.emplace_back(it->second);
+	}
+
+	for (auto it = ++upperbound; it != mPrimaryIndexTable.end(); it++)
+	{
+		match_addrs.emplace_back(it->second);
+	}
+
+	return match_addrs.size();
+}
+
+uint32_t PrimaryIndexFile::get_not(const attr_t & attr_ref, const uint32_t fix_addr, std::vector<AddrPair>& match_pairs)
+{
+	PrimaryIndexTable::iterator lowerbound = mPrimaryIndexTable.lower_bound(attr_ref);
+	PrimaryIndexTable::iterator upperbound = mPrimaryIndexTable.upper_bound(attr_ref);
+
+	for (auto it = mPrimaryIndexTable.begin(); it != lowerbound; it++)
+	{
+		match_pairs.emplace_back(fix_addr, it->second);
+	}
+
+	for (auto it = upperbound; it != mPrimaryIndexTable.end(); it++)
+	{
+		match_pairs.emplace_back(fix_addr, it->second);
+	}
+
+	return match_pairs.size();
 }
 
 bool PrimaryIndexFile::get_primary(const attr_t & attr_ref, uint32_t * match_addr)
@@ -256,6 +328,21 @@ uint32_t TreeIndexFile::get(const attr_t & attr_pivot, relation_type_t find_type
 	}
 	return cnt;
 	
+}
+
+uint32_t TreeIndexFile::get(const attr_t & attr_ref, const uint32_t fix_addr, std::vector<AddrPair>& match_pairs)
+{
+	return uint32_t();
+}
+
+uint32_t TreeIndexFile::get_not(const attr_t & attr_ref, std::vector<uint32_t>& match_addrs)
+{
+	return uint32_t();
+}
+
+uint32_t TreeIndexFile::get_not(const attr_t & attr_ref, const uint32_t fix_addr, std::vector<AddrPair>& match_pairs)
+{
+	return uint32_t();
 }
 
 void TreeIndexFile::write_back()
