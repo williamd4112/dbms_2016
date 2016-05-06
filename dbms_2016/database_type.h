@@ -29,7 +29,7 @@
 
 extern const char *kAttrTypeNames[];
 
-enum FindType
+enum relation_type_t
 {
 	EQ, NEQ, LESS, LARGE
 };
@@ -141,6 +141,14 @@ public:
 		assert(a.Domain() == b.Domain());
 		if (a.Domain() == INTEGER_DOMAIN) return a.Int() < b.Int();
 		else if (a.Domain() == VARCHAR_DOMAIN) return strncmp(a.Varchar(), b.Varchar(), ATTR_NUM_MAX) < 0;
+		else return false;
+	}
+
+	friend bool operator >(const attr_t &a, const attr_t &b)
+	{
+		assert(a.Domain() == b.Domain());
+		if (a.Domain() == INTEGER_DOMAIN) return a.Int() > b.Int();
+		else if (a.Domain() == VARCHAR_DOMAIN) return strncmp(a.Varchar(), b.Varchar(), ATTR_NUM_MAX) > 0;
 		else return false;
 	}
 

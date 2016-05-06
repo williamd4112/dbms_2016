@@ -77,7 +77,7 @@ public:
 	bool set(const attr_t &attr_ref, const uint32_t record_addr);
 	uint32_t get(const attr_t &attr_ref, std::vector<uint32_t> &match_addrs);
 	uint32_t get(const attr_t &attr_lower, const attr_t &attr_upper, std::vector<uint32_t> &match_addrs);
-	uint32_t get(const attr_t &attr_pivot, FindType find_type, std::vector<uint32_t> &match_addrs);
+	uint32_t get(const attr_t &attr_pivot, relation_type_t find_type, std::vector<uint32_t> &match_addrs);
 
 	void write_back();
 	void read_from();

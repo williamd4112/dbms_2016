@@ -13,7 +13,7 @@
 
 typedef table_attr_desc_t AttrDesc;
 typedef table_header_t TableHeader;
-typedef std::unordered_map<std::string, AttrDesc*> AttrDescTable;
+typedef std::unordered_map<std::string, int> AttrDescTable;
 typedef std::vector<AttrDesc> AttrDescPool;
 
 /*
@@ -40,6 +40,7 @@ public:
 
 	const AttrDesc &get_attr_desc(const char *attr_name);
 	const AttrDescPool &get_attr_descs();
+	const int get_attr_id(const char *attr_name);
 	const TableHeader &get_header() { return mTableHeader; }
 	IndexFile *get_index_file(const char *attr_name);
 	const char *get_pk_attr_name();

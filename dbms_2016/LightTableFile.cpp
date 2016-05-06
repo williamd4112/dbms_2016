@@ -62,12 +62,22 @@ const AttrDesc &LightTableFile::get_attr_desc(const char * attr_name)
 	auto res = mAttrDescTable.find(attr_name);
 	if (res == mAttrDescTable.end())
 		throw exception_t(ATTR_NOT_FOUND, attr_name);
-	return *(res->second);
+	return mAttrDescPool.at(res->second);
 }
 
 const AttrDescPool & LightTableFile::get_attr_descs()
 {
 	return mAttrDescPool;
+}
+
+const int LightTableFile::get_attr_id(const char * attr_name)
+{
+	auto res = mAttrDescTable.find(attr_name);
+	if (res != mAttrDescTable.end())
+	{
+		return res->second;
+	}
+	return -1;
 }
 
 IndexFile * LightTableFile::get_index_file(const char *attr_name)
@@ -157,9 +167,9 @@ void LightTableFile::dump_info()
 inline void LightTableFile::build_attr_desc_index()
 {
 	mAttrDescTable.clear();
-	for (AttrDescPool::iterator it = mAttrDescPool.begin(); it != mAttrDescPool.end(); it++)
+	for (int i = 0; i < mAttrDescPool.size(); i++)
 	{
-		mAttrDescTable[it->name] = &(*it);
+		mAttrDescTable[mAttrDescPool[i].name] = i;
 	}
 }
 

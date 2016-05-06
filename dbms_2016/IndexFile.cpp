@@ -25,7 +25,9 @@ HashIndexFile::~HashIndexFile()
 
 bool HashIndexFile::set(const attr_t & attr_ref, const uint32_t record_addr)
 {
-	return mHashIndexTable.insert(pair<attr_t, uint32_t>(attr_ref, record_addr))->second;
+	// Multi_map always insertion success
+	mHashIndexTable.insert(pair<attr_t, uint32_t>(attr_ref, record_addr));
+	return true;
 }
 
 uint32_t HashIndexFile::get(const attr_t &attr_ref, std::vector<uint32_t> &match_addrs)
@@ -188,7 +190,8 @@ TreeIndexFile::~TreeIndexFile()
 
 bool TreeIndexFile::set(const attr_t & attr_ref, const uint32_t record_addr)
 {
-	return mTreeIndexTable.insert(pair<attr_t, uint32_t>(attr_ref, record_addr))->second;
+	mTreeIndexTable.insert(pair<attr_t, uint32_t>(attr_ref, record_addr));
+	return true;
 }
 
 uint32_t TreeIndexFile::get(const attr_t & attr_ref, std::vector<uint32_t>& match_addrs)
@@ -222,7 +225,7 @@ uint32_t TreeIndexFile::get(const attr_t & attr_lower, const attr_t & attr_upper
 	return cnt;
 }
 
-uint32_t TreeIndexFile::get(const attr_t & attr_pivot, FindType find_type, std::vector<uint32_t>& match_addrs)
+uint32_t TreeIndexFile::get(const attr_t & attr_pivot, relation_type_t find_type, std::vector<uint32_t>& match_addrs)
 {
 	TreeIndexTable::iterator begin;
 	TreeIndexTable::iterator end;

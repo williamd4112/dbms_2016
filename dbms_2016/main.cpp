@@ -304,6 +304,7 @@ void test_light_tablefile_read()
 }
 
 LightTable tbl;
+LightTable t1, t2;
 
 void test_light_table_create()
 {
@@ -349,6 +350,57 @@ void test_light_table_find()
 	}
 }
 
+void test_lite_table_join()
+{
+	table_attr_desc_t t1_descs[4] = {
+		{ "ID", ATTR_TYPE_INTEGER, 0, 4, 0 },
+		{ "Name", ATTR_TYPE_VARCHAR, 4, 40, 0 },
+		{ "Addr", ATTR_TYPE_VARCHAR, 44, 10, 0 },
+		{ "Grade", ATTR_TYPE_INTEGER, 54, 4, 0 }
+	};
+
+	table_attr_desc_t t2_descs[2] = {
+		{ "BookID", ATTR_TYPE_INTEGER, 0, 4, 0 },
+		{ "BookName", ATTR_TYPE_VARCHAR, 4, 40, 0 }
+	};
+
+	t1.create("table1", t1_descs, 4);
+
+	AttrTuple t1_tuple(4);
+	char name[40], addr[40];
+	for (int i = 0; i < 1000; i++)
+	{
+		sprintf(name, "Name%d", i);
+		sprintf(addr, "Addr%d", i);
+		t1_tuple[0] = i;
+		t1_tuple[1] = name;
+		t1_tuple[2] = addr;
+		t1_tuple[3] = i * 10;
+		t1.insert(t1_tuple);
+	}
+
+	AttrTuple t2_tuple(2);
+	char bookname[40];
+	t2.create("table2", t2_descs, 2);
+	for (int i = 0; i < 1000; i++)
+	{
+		sprintf(bookname, "Book%d", i);
+		t2_tuple[0] = i;
+		t2_tuple[1] = bookname;
+		t2.insert(t2_tuple);
+	}
+}
+
+
+void test_join()
+{
+	const char *a_select[] = { "ID" };
+	const char *b_select[] = { "BookID", "BookName" };
+	std::vector<AddrPair> match_addrs;
+
+	LightTable::join(t1, "ID", EQ, t2, "BookID", match_addrs);
+}
+
 static Database<PAGESIZE_8K> database("database.dbs");
 
 /*
@@ -357,8 +409,8 @@ static Database<PAGESIZE_8K> database("database.dbs");
 */
 int main(int argc, char *argv[])
 {
-	profile_pefromance(test_light_table_create);
-	profile_pefromance(test_light_table_find);
+	test_lite_table_join();
+	profile_pefromance(test_join);
 
 	system("pause");
 	return 0;
