@@ -266,19 +266,6 @@ bool TreeIndexFile::set(const attr_t & attr_ref, const uint32_t record_addr)
 	return true;
 }
 
-uint32_t TreeIndexFile::get(const attr_t & attr_lower, const attr_t & attr_upper, std::vector<uint32_t>& match_addrs)
-{
-	TreeIndexTable::iterator begin = mTreeIndexTable.lower_bound(attr_lower);
-	TreeIndexTable::iterator end = mTreeIndexTable.upper_bound(attr_upper);
-	if (begin == end)
-		return 0;
-
-	for (auto it = begin; it != end; it++)
-		match_addrs.emplace_back(it->second);
-	
-	return match_addrs.size();
-}
-
 uint32_t TreeIndexFile::get(const attr_t & attr_ref, std::vector<uint32_t>& match_addrs)
 {
 	auto range = mTreeIndexTable.equal_range(attr_ref);
@@ -289,6 +276,23 @@ uint32_t TreeIndexFile::get(const attr_t & attr_ref, std::vector<uint32_t>& matc
 		match_addrs.emplace_back(it->second);
 	
 	return match_addrs.size();
+}
+
+uint32_t TreeIndexFile::get(const attr_t & attr_ref, const relation_type_t rel_type, std::vector<uint32_t>& match_addrs)
+{
+	switch (rel_type)
+	{
+	case EQ:
+		return get(attr_ref, match_addrs);
+	case NEQ:
+		return get_not(attr_ref, match_addrs);
+	case LESS:
+		return get_less(attr_ref, match_addrs);
+	case LARGE:
+		return get_large(attr_ref, match_addrs);
+	default:
+		throw exception_t(UNKNOWN_RELATION_TYPE, "Unkown relation type");
+	}
 }
 
 uint32_t TreeIndexFile::get(const attr_t & attr_ref, const uint32_t fix_addr, std::vector<AddrPair>& match_pairs)

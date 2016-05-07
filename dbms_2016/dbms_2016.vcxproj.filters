@@ -117,6 +117,12 @@
     <ClCompile Include="LightTable.cpp">
       <Filter>原始程式檔</Filter>
     </ClCompile>
+    <ClCompile Include="DatabaseLite.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="DatabaseLiteFile.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="FileUtil.h">
@@ -240,6 +246,12 @@
       <Filter>標頭檔</Filter>
     </ClInclude>
     <ClInclude Include="database_table_type.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="DatabaseLite.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="DatabaseLiteFile.h">
       <Filter>標頭檔</Filter>
     </ClInclude>
   </ItemGroup>

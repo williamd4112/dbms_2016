@@ -14,6 +14,8 @@ LightTableFile::LightTableFile()
 
 LightTableFile::~LightTableFile()
 {
+	for (auto it = mIndexFileMap.begin(); it != mIndexFileMap.end(); it++)
+		delete it->second;
 }
 
 inline void LightTableFile::create(const char *tablename, AttrDesc * descs, int num)
@@ -190,7 +192,7 @@ inline IndexFile * LightTableFile::gen_indexfile(const AttrDesc & desc, IndexTyp
 		domain = VARCHAR_DOMAIN;
 		break;
 	default:
-		throw exception_t(TYPE_UNDEFINED, "Cannot create index, unknown type.");
+		throw exception_t(TYPE_UNDEFINED, "Cannot set_table index, unknown type.");
 	}
 
 	switch (index_type)

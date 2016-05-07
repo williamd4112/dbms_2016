@@ -1,5 +1,5 @@
 #include "database_util.h"
-#include "database_util.h"
+#include "system.h"
 #include <cassert>
 
 int db::parse_int(unsigned char * const record, const table_attr_desc_t &desc)
@@ -44,5 +44,18 @@ void db::print_record(const table_attr_desc_t * pDesc, const unsigned char * pRe
 		break;
 	default:
 		throw UNRESOLVED_ATTR_TYPE;
+	}
+}
+
+uint8_t db::type_coldef_to_attr(sql::ColumnDefinition::DataType coldef_type)
+{
+	switch (coldef_type)
+	{
+	case sql::ColumnDefinition::DataType::INT:
+		return ATTR_TYPE_INTEGER;
+	case sql::ColumnDefinition::DataType::VARCHAR:
+		return ATTR_TYPE_VARCHAR;
+	default:
+		throw exception_t(ERROR_COLDEF_ATTR_CONVERT, "Unknown col def type");
 	}
 }

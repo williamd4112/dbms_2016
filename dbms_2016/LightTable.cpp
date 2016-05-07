@@ -1,9 +1,11 @@
 #include "LightTable.h"
 
 #include <algorithm>
+#include <functional>
 
 #define BIT_HAS_HASH 0x1
 #define BIT_HAS_TREE 0x2
+
 
 std::ostream &operator <<(std::ostream &os, const AttrTuple tuple)
 {
@@ -108,6 +110,19 @@ void LightTable::join(
 	default:
 		throw exception_t(UNKNOWN_RELATION, "Unknown relation type.");
 	}
+}
+
+void LightTable::join(
+	LightTable & table, std::string table_keyname, 
+	relation_type_t rel_type, attr_t & kAttr, 
+	LightTable & onto_table,
+	std::vector<AddrPair> & match_pairs)
+{
+	std::vector<uint32_t> match_addrs;
+	match_addrs.reserve(table.size());
+	
+	table.filter(table_keyname.c_str(), kAttr, rel_type, match_addrs);
+	map(match_addrs, onto_table, match_pairs);
 }
 
 void LightTable::select(
@@ -215,10 +230,10 @@ void LightTable::insert(AttrTuple & tuple)
 	if specified attribute has index, use index to find all matched addrs
 	if not, use exhaustive search to find all matched addrs
 */
-uint32_t LightTable::find(
+uint32_t LightTable::filter(
 	const char * attr_name, 
 	attr_t &attr, 
-	relation_type_t find_type, 
+	relation_type_t rel_type, 
 	std::vector<uint32_t> & match_addrs)
 {
 	uint32_t match_num = 0;
@@ -227,22 +242,11 @@ uint32_t LightTable::find(
 	IndexFile *index_file = mTablefile.get_index_file(attr_name);
 	if (index_file != NULL)
 	{
-		match_num = find_with_index(attr_name, attr, find_type, index_file, match_addrs);
+		filter_with_index(attr_name, attr, rel_type, index_file, match_addrs);
 	}
 	else
 	{
-		int attr_id = mTablefile.get_attr_id(attr_name);
-		if (attr_id < 0)
-			throw exception_t(UNKNOWN_ATTR, attr_name);
-		
-		for (AttrTupleIterator it = begin(); it != end(); it++)
-		{
-			if (it->at(attr_id) == attr)
-			{
-				match_num++;
-				match_addrs.push_back(it - begin());
-			}
-		}
+		filter_naive(attr_name, attr, rel_type, match_addrs);
 	}	
 	return match_num;
 }
@@ -325,42 +329,70 @@ inline void LightTable::update_index(AttrTuple & tuple, uint32_t addr)
 	}
 }
 
-uint32_t LightTable::find_with_index(
+uint32_t LightTable::filter_with_index(
 	const char * attr_name, 
 	attr_t & attr, 
-	relation_type_t find_type, 
+	relation_type_t rel_type, 
 	IndexFile *index_file, 
 	std::vector<uint32_t>& match_addrs)
 {
-	uint32_t match_num = 0;
-
-	switch (find_type)
+	switch (rel_type)
 	{
 	case EQ:
-		match_num = index_file->get(attr, match_addrs);
+		index_file->get(attr, match_addrs);
 		break;
 	case NEQ:
-		assert(false);
+		index_file->get_not(attr, match_addrs);
 		break;
-	case LESS: 
+	case LESS: case LARGE:
 		{
-			assert(index_file->type() == TREE || index_file->type() == PTREE);
-			TreeIndexFile *tindex_file = static_cast<TreeIndexFile*>(index_file);
-			match_num = tindex_file->get(attr, LESS, match_addrs);
+			if (index_file->type() == TREE || index_file->type() == PTREE)
+			{
+				TreeIndexFile *tindex_file = static_cast<TreeIndexFile*>(index_file);
+				tindex_file->get(attr, rel_type, match_addrs);
+			}
+			else
+				filter_naive(attr_name, attr,  rel_type, match_addrs);
 		}	
-		break;
-	case LARGE:
-		{
-			assert(index_file->type() == TREE || index_file->type() == PTREE);
-			TreeIndexFile *tindex_file = static_cast<TreeIndexFile*>(index_file);
-			match_num = tindex_file->get(attr, LARGE, match_addrs);
-		}
 		break;
 	default:
 		throw exception_t(UNKNOWN_RELATION, "Unknown relation type");
 	}
 
-	return match_num;
+	return match_addrs.size();
+}
+
+uint32_t LightTable::filter_naive(const char * attr_name, attr_t & attr, relation_type_t rel_type, std::vector<uint32_t>& match_addrs)
+{
+	int attr_id = mTablefile.get_attr_id(attr_name);
+	if (attr_id < 0)
+		throw exception_t(UNKNOWN_ATTR, attr_name);
+
+	for (AttrTupleIterator it = begin(); it != end(); it++)
+	{
+		switch (rel_type)
+		{
+		case EQ:
+			if (it->at(attr_id) == attr)
+				match_addrs.push_back(it - begin());
+			break;
+		case NEQ:
+			if (it->at(attr_id) != attr)
+				match_addrs.push_back(it - begin());
+			break;
+		case LESS:
+			if (it->at(attr_id) < attr)
+				match_addrs.push_back(it - begin());
+			break;
+		case LARGE:
+			if (it->at(attr_id) > attr)
+				match_addrs.push_back(it - begin());
+			break;
+		default:
+			throw exception_t(UNKNOWN_RELATION, "Unknown relation type.");
+		}
+	}
+	return match_addrs.size();
 }
 
 inline IndexFile * LightTable::get_index_file(const char * name)
@@ -550,6 +582,19 @@ inline void LightTable::join_one_tree(
 	default:
 		throw exception_t(UNKNOWN_RELATION, "Unknown relation type");
 	}
+}
+
+inline void LightTable::map(
+	std::vector<uint32_t>& addrs, 
+	LightTable & onto_table, 
+	std::vector<AddrPair>& match_pairs)
+{
+	auto begin = onto_table.begin();
+	auto end = onto_table.end();
+
+	for (uint32_t addr : addrs)
+		for (auto it = begin; it != end; it++)
+			match_pairs.emplace_back(addr, it - begin);
 }
 
 void LightTable::join_naive(

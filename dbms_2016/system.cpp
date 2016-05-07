@@ -27,7 +27,7 @@ void sub_error(const char *msg)
 	printf("Warning: %s\n", msg);
 }
 
-void profile_pefromance(Routine routine)
+void profile(Routine routine)
 {
 	clock_t begin, end;
 	double time_spent;

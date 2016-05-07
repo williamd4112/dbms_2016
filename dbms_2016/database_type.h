@@ -27,11 +27,15 @@
 
 #define INDEX_FILENAME_MAX 80
 #define INDEX_RECORD_SIZE_MAX 255
+#define UNKNOWN_RELATION_TYPE 0x81
 
 extern const char *kAttrTypeNames[];
 
 template <class T, class HashType>
 using HashSet = std::unordered_set<T, HashType>;
+
+template <class K, class V>
+using HashMap = std::unordered_map<K, V>;
 
 enum relation_type_t
 {
@@ -173,6 +177,11 @@ public:
 		default: // NULL TYPE
 			return true;
 		}
+	}
+
+	inline friend bool operator!=(const attr_t &a, const attr_t &b)
+	{
+		return !(a == b);
 	}
 private:
 	attr_domain_t domain;

@@ -140,6 +140,8 @@
     <ClCompile Include="Condition.cpp" />
     <ClCompile Include="Database.cpp" />
     <ClCompile Include="DatabaseFile.cpp" />
+    <ClCompile Include="DatabaseLite.cpp" />
+    <ClCompile Include="DatabaseLiteFile.cpp" />
     <ClCompile Include="database_type.cpp" />
     <ClCompile Include="database_util.cpp" />
     <ClCompile Include="DiskFile.cpp" />
@@ -180,6 +182,8 @@
     <ClInclude Include="..\Project1\Project1\sql\Table.h" />
     <ClInclude Include="BinaryObject.h" />
     <ClInclude Include="Bit.h" />
+    <ClInclude Include="DatabaseLite.h" />
+    <ClInclude Include="DatabaseLiteFile.h" />
     <ClInclude Include="database_table_type.h" />
     <ClInclude Include="LightTable.h" />
     <ClInclude Include="LightTableFile.h" />

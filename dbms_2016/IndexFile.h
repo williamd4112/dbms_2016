@@ -84,7 +84,7 @@ public:
 
 	bool set(const attr_t &attr_ref, const uint32_t record_addr);
 	uint32_t get(const attr_t &attr_ref, std::vector<uint32_t> &match_addrs);
-	uint32_t get(const attr_t &attr_lower, const attr_t &attr_upper, std::vector<uint32_t> &match_addrs);
+	uint32_t get(const attr_t &attr_ref, const relation_type_t rel_type, std::vector<uint32_t> &match_addrs);
 	uint32_t get(const attr_t &attr_ref, const uint32_t fix_addr, std::vector<AddrPair> &match_pairs);
 
 	uint32_t get_not(const attr_t &attr_ref, std::vector<uint32_t> &match_addrs);

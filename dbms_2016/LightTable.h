@@ -37,6 +37,14 @@ public:
 		std::string b_keyname,
 		std::vector<AddrPair> &match_pairs);
 
+	static void join(
+		LightTable &table,
+		std::string table_keyname,
+		relation_type_t rel_type,
+		attr_t & kAttr,
+		LightTable & onto_table,
+		std::vector<AddrPair> & match_pairs);
+
 	static void join_naive(
 		LightTable &a,
 		std::string a_keyname,
@@ -56,8 +64,7 @@ public:
 		std::vector<std::string> &a_select_attr_names,
 		LightTable &b,
 		std::vector<std::string> &b_select_attr_names,
-		std::vector<AddrPair> &match_pairs
-		);
+		std::vector<AddrPair> &match_pairs);
 
 	void create(const char *tablename, AttrDesc *descs, int num);
 	void load(const char *tablename);
@@ -65,7 +72,7 @@ public:
 
 	void create_index(const char *attr_name, IndexType type);
 	void insert(AttrTuple &tuple);
-	uint32_t find(const char *attr_name, attr_t & attr, relation_type_t find_type, std::vector<uint32_t> & match_addrs);
+	uint32_t filter(const char *attr_name, attr_t & attr, relation_type_t find_type, std::vector<uint32_t> & match_addrs);
 	
 	AttrTuple &get_tuple(uint32_t index);
 	int get_attr_id(std::string attr_name);
@@ -84,7 +91,8 @@ private:
 	inline uint32_t insert_with_pk(AttrTuple &tuple);
 	inline uint32_t insert_no_pk(AttrTuple &tuple);
 	inline void update_index(AttrTuple &tuple, uint32_t addr);
-	uint32_t find_with_index(const char *attr_name, attr_t & attr, relation_type_t find_type, IndexFile *index_file, std::vector<uint32_t> & match_addrs);
+	uint32_t filter_with_index(const char *attr_name, attr_t & attr, relation_type_t find_type, IndexFile *index_file, std::vector<uint32_t> & match_addrs);
+	uint32_t filter_naive(const char *attr_name, attr_t & attr, relation_type_t rel_type, std::vector<uint32_t> & match_addrs);
 	inline IndexFile *get_index_file(const char *name);
 	inline void init_seq_types(AttrDesc *descs, int num);
 	void get_selectid_from_names(std::vector<std::string> &names, std::vector<int> &ids);
@@ -132,5 +140,11 @@ private:
 		std::string b_keyname,
 		IndexFile *b_index,
 		std::vector<AddrPair> &match_pairs);
+
+	static inline void map(
+		std::vector<uint32_t> & addrs,
+		LightTable & onto_table,
+		std::vector<AddrPair> & match_pairs
+	);
 };
 

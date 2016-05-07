@@ -16,7 +16,7 @@ typedef void(*Routine)();
 void fatal_error();
 void sub_error(const char *);
 
-void profile_pefromance(Routine routine);
+void profile(Routine routine);
 
 struct exception_t
 {

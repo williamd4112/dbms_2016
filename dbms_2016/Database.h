@@ -161,7 +161,7 @@ inline void Database<PAGESIZE>::create_index(
 	}
 	else
 	{
-		Error("%s failed to create index %s\n", PROMPT_PREFIX, index_name);
+		Error("%s failed to set_table index %s\n", PROMPT_PREFIX, index_name);
 	}
 }
 
