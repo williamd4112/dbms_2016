@@ -78,7 +78,7 @@ void LightTable::join(
 				rel_type, 
 				b, b_keyname, b_index_file, match_pairs);
 		else if ((a_stat & BIT_HAS_TREE) && (b_stat & BIT_HAS_TREE))
-			join_tree_eq(a, a_keyname, a_index_file,
+			join_two_tree(a, a_keyname, a_index_file,
 				rel_type,
 				b, b_keyname, b_index_file, match_pairs);
 		else
@@ -92,20 +92,21 @@ void LightTable::join(
 		// 2. b has tree
 		// 3. Naive
 		if ((a_stat & BIT_HAS_TREE) && (b_stat & BIT_HAS_TREE))
-		{
-
-		}
-		else if (b_stat & BIT_HAS_TREE)
-		{
-
-		}
+			join_two_tree(a, a_keyname, a_index_file,
+				rel_type,
+				b, b_keyname, b_index_file, match_pairs);
+		else if ((b_stat & BIT_HAS_TREE))
+			join_one_tree(a, a_keyname, a_index_file,
+				rel_type,
+				b, b_keyname, b_index_file, match_pairs);
 		else
-		{
-
-		}
+			join_naive(a, a_keyname,
+				rel_type,
+				b, b_keyname,
+				match_pairs);
 		break;
 	default:
-		break;
+		throw exception_t(UNKNOWN_RELATION, "Unknown relation type.");
 	}
 }
 
@@ -408,7 +409,7 @@ void LightTable::get_selectid_from_names(std::vector<std::string>& names, std::v
 /*
 	join_hash
 
-	always use a to index, b to iter
+	always use a to iter, b to index
 
 */
 inline void LightTable::join_hash(
@@ -467,40 +468,88 @@ inline void LightTable::hashjoin_not(
 	}
 }
 
-void LightTable::join_tree_eq(
+void LightTable::join_two_tree(
 	LightTable & a, std::string a_keyname, IndexFile * a_index,
 	relation_type_t rel_type, 
 	LightTable & b, std::string b_keyname, IndexFile * b_index,
 	std::vector<AddrPair> &match_pairs)
 {
 	assert(a_index != NULL && b_index != NULL);
-	
-	const TreeIndexFile *ta = static_cast<TreeIndexFile*>(a_index);
-	const TreeIndexFile *tb = static_cast<TreeIndexFile*>(b_index);
-	
+
+	const TreeIndexFile &ta = static_cast<TreeIndexFile&>(*a_index);
+	const TreeIndexFile &tb = static_cast<TreeIndexFile&>(*b_index);
+
 	switch (rel_type)
 	{
 	case EQ:
-		TreeIndexFile::merge_eq(*ta, *tb, match_pairs);
+		TreeIndexFile::merge_eq(ta, tb, match_pairs);
 		break;
 	case NEQ:
-		TreeIndexFile::merge_neq(*ta, *tb, match_pairs);
+		TreeIndexFile::merge_neq(ta, tb, match_pairs);
 		break;
 	case LESS:
+		TreeIndexFile::merge_less(ta, tb, match_pairs);
 		break;
 	case LARGE:
+		TreeIndexFile::merge_large(ta, tb, match_pairs);
 		break;
 	default:
-		break;
+		throw exception_t(UNKNOWN_RELATION, "Unknown relation type");
 	}
+	
 }
 
-inline void LightTable::join_tree_than(
+inline void LightTable::join_one_tree(
 	LightTable & a, std::string a_keyname, IndexFile * a_index, 
-	relation_type_t rel_type, 
+	relation_type_t rel_type,
 	LightTable & b, std::string b_keyname, IndexFile * b_index, 
 	std::vector<AddrPair>& match_pairs)
 {
+	assert(b_index != NULL && b_index->type() == TREE);
+	
+	TreeIndexFile &tindex = static_cast<TreeIndexFile&>(*b_index);
+	LightTable &iter_table = a;
+
+	int iter_key_id = a.mTablefile.get_attr_id(a_keyname.c_str());
+	//int b_key_id = b.mTablefile.get_attr_id(b_keyname.c_str());
+
+	switch (rel_type)
+	{
+	case EQ:
+		for (auto it = iter_table.begin(); it != iter_table.end(); it++)
+		{
+			uint32_t iter_addr = it - iter_table.begin();
+			attr_t & iter_key_attr = it->at(iter_key_id);
+			tindex.get(iter_key_attr, iter_addr, match_pairs);
+		}
+		break;
+	case NEQ:
+		for (auto it = iter_table.begin(); it != iter_table.end(); it++)
+		{
+			uint32_t iter_addr = it - iter_table.begin();
+			attr_t & iter_key_attr = it->at(iter_key_id);
+			tindex.get_not(iter_key_attr, iter_addr, match_pairs);
+		}
+		break;
+	case LESS:
+		for (auto it = iter_table.begin(); it != iter_table.end(); it++)
+		{
+			uint32_t iter_addr = it - iter_table.begin();
+			attr_t & iter_key_attr = it->at(iter_key_id);
+			tindex.get_less(iter_key_attr, iter_addr, match_pairs);
+		}
+		break;
+	case LARGE:
+		for (auto it = iter_table.begin(); it != iter_table.end(); it++)
+		{
+			uint32_t iter_addr = it - iter_table.begin();
+			attr_t & iter_key_attr = it->at(iter_key_id);
+			tindex.get_large(iter_key_attr, iter_addr, match_pairs);
+		}
+		break;
+	default:
+		throw exception_t(UNKNOWN_RELATION, "Unknown relation type");
+	}
 }
 
 void LightTable::join_naive(
@@ -541,11 +590,11 @@ void LightTable::join_naive(
 					match_pairs.push_back({ a_id, b_id });
 				break;
 			case LESS:
-				if (!(ait->at(a_key_id) < bit->at(b_key_id)))
+				if ((ait->at(a_key_id) < bit->at(b_key_id)))
 					match_pairs.push_back({ a_id, b_id });
 				break;
 			case LARGE:
-				if (!(ait->at(a_key_id) > bit->at(b_key_id)))
+				if ((ait->at(a_key_id) > bit->at(b_key_id)))
 					match_pairs.push_back({ a_id, b_id });
 				break;
 			default:

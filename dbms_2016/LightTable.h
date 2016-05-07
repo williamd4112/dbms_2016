@@ -113,7 +113,7 @@ private:
 		IndexFile *fix_index,
 		std::vector<AddrPair> &match_pairs);
 
-	static inline void join_tree_eq(
+	static inline void join_two_tree(
 		LightTable &a,
 		std::string a_keyname,
 		IndexFile *a_index,
@@ -123,7 +123,7 @@ private:
 		IndexFile *b_index,
 		std::vector<AddrPair> &match_pairs);
 
-	static inline void join_tree_than(
+	static inline void join_one_tree(
 		LightTable &a,
 		std::string a_keyname,
 		IndexFile *a_index,

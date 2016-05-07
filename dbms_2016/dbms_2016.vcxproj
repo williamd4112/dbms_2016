@@ -118,6 +118,8 @@
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>C:\Users\williamd\Documents\Visual Studio 2015\Projects\sqlparser-master\Project1\Project1;%(AdditionalIncludeDirectories);C:\Users\User\Documents\Visual Studio 2015\Projects\sqlparser-master\Project1\Project1</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <UndefinePreprocessorDefinitions>
+      </UndefinePreprocessorDefinitions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>

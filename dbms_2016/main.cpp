@@ -366,6 +366,7 @@ void test_lite_table_join()
 	};
 
 	t1.create("table1", t1_descs, 4);
+	t1.create_index("Name", TREE);
 	t1.create_index("Grade", TREE);
 
 	AttrTuple t1_tuple(4);
@@ -384,13 +385,15 @@ void test_lite_table_join()
 	AttrTuple t2_tuple(3);
 	char bookname[40];
 	t2.create("table2", t2_descs, 3);
+	t2.create_index("BookName", TREE);
 	t2.create_index("BookGrade", TREE);
-	for (int i = 0; i < 100; i++)
+
+	for (int i = 0; i < 20; i++)
 	{
-		sprintf(bookname, "Name%d", i % 10);
+		sprintf(bookname, "Name%d", i);
 		t2_tuple[0] = i;
 		t2_tuple[1] = bookname;
-		t2_tuple[2] = i * 10;
+		t2_tuple[2] = (i % 10) * 10;
 		t2.insert(t2_tuple);
 	}
 }
@@ -413,21 +416,21 @@ void test_join_naive()
 void test_join_hash()
 {
 	const char *a_select[] = { "Name" , "Grade"};
-	const char *b_select[] = { "BookID", "BookGrade" };
+	const char *b_select[] = { "BookID", "BookName", "BookGrade" };
 
 	std::vector<AddrPair> match_addrs_id;
 	std::vector<AddrPair> match_addrs_name;
 	std::vector<AddrPair> matchs;
 
-	LightTable::join(t1, "Grade", EQ, t2, "BookGrade", match_addrs_id);
+	LightTable::join(t1, "Grade", LARGE, t2, "BookGrade", match_addrs_id);
 	//LightTable::join(t1, "Name", EQ, t2, "BookName", match_addrs_name);
 	//LightTable::merge(match_addrs_id, AND, match_addrs_name, matchs);
 
 	LightTable::select(
 		t1, std::vector<std::string>(a_select, a_select + 2),
-		t2, std::vector<std::string>(b_select, b_select + 2),
+		t2, std::vector<std::string>(b_select, b_select + 3),
 		match_addrs_id);
-	printf("\n");
+	printf("# %d\n", match_addrs_id.size());
 
 	//LightTable::select(
 	//	t1, std::vector<std::string>(a_select, a_select + 2),
