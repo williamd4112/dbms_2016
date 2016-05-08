@@ -5,6 +5,7 @@
 #include <unordered_set>
 #include <map>
 #include <vector>
+#include <stack>
 #include <iostream>
 #include <cassert>
 
@@ -37,6 +38,22 @@ using HashSet = std::unordered_set<T, HashType>;
 template <class K, class V>
 using HashMap = std::unordered_map<K, V>;
 
+struct c_unique {
+	int current;
+	c_unique();
+	int operator()();
+};
+
+enum attr_exception_t
+{
+	ATTR_UNSUPPORTED_OP
+};
+
+enum unary_op_type_t
+{
+	POS, NEG
+};
+
 enum relation_type_t
 {
 	EQ, NEQ, LESS, LARGE
@@ -53,6 +70,10 @@ enum attr_domain_t
 	VARCHAR_DOMAIN,
 	UNDEFINED_DOMAIN
 };
+
+unary_op_type_t operator -(const unary_op_type_t u);
+
+unary_op_type_t operator *(const unary_op_type_t a, const unary_op_type_t b);
 
 struct attr_t
 {
@@ -182,6 +203,20 @@ public:
 	inline friend bool operator!=(const attr_t &a, const attr_t &b)
 	{
 		return !(a == b);
+	}
+
+	inline attr_t operator -()
+	{
+		if (domain != INTEGER_DOMAIN)
+			throw ATTR_UNSUPPORTED_OP;
+		return attr_t(-value.integer);
+	}
+	
+	inline attr_t operator *(const unary_op_type_t op)
+	{
+		if (domain != INTEGER_DOMAIN)
+			throw ATTR_UNSUPPORTED_OP;
+		return (op == POS) ? attr_t(value.integer) : attr_t(-value.integer);
 	}
 private:
 	attr_domain_t domain;

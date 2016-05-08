@@ -47,19 +47,30 @@ uint32_t HashIndexFile::get(const attr_t &attr_ref, std::vector<uint32_t> &match
 	return cnt;
 }
 
+uint32_t HashIndexFile::get(const attr_t &attr_ref, std::vector<AddrPair> &match_pairs)
+{
+	auto result = mHashIndexTable.equal_range(attr_ref);
+	if (result.first == result.second)
+		return 0;
+
+	for (auto it = result.first; it != result.second; it++)
+	{
+		match_pairs.emplace_back(it->second, it->second);
+	}
+	return match_pairs.size();
+}
+
 uint32_t HashIndexFile::get(const attr_t &attr_ref, const uint32_t fix_addr, std::vector<AddrPair> &match_pairs)
 {
 	auto result = mHashIndexTable.equal_range(attr_ref);
 	if (result.first == result.second)
 		return 0;
 
-	uint32_t cnt = 0;
 	for (auto it = result.first; it != result.second; it++)
 	{
 		match_pairs.emplace_back(fix_addr, it->second);
-		cnt++;
 	}
-	return cnt;
+	return match_pairs.size();
 }
 
 uint32_t HashIndexFile::get_not(const attr_t & attr_ref, std::vector<uint32_t>& match_addrs)
@@ -71,6 +82,17 @@ uint32_t HashIndexFile::get_not(const attr_t & attr_ref, std::vector<uint32_t>& 
 	}
 
 	return match_addrs.size();
+}
+
+uint32_t HashIndexFile::get_not(const attr_t & attr_ref, std::vector<AddrPair>& match_pairs)
+{
+	for (auto it = mHashIndexTable.begin(); it != mHashIndexTable.end(); it++)
+	{
+		if (!(it->first == attr_ref))
+			match_pairs.emplace_back(it->second, it->second);
+	}
+
+	return match_pairs.size();
 }
 
 uint32_t HashIndexFile::get_not(const attr_t & attr_ref, const uint32_t fix_addr, std::vector<AddrPair>& match_pairs)
@@ -155,6 +177,17 @@ uint32_t PrimaryIndexFile::get(const attr_t & attr_ref, std::vector<uint32_t>& m
 	return false;
 }
 
+uint32_t PrimaryIndexFile::get(const attr_t & attr_ref, std::vector<AddrPair>& match_pairs)
+{
+	auto res = mPrimaryIndexTable.find(attr_ref);
+	if (res != mPrimaryIndexTable.end())
+	{
+		match_pairs.emplace_back(res->second, res->second);
+		return true;
+	}
+	return false;
+}
+
 uint32_t PrimaryIndexFile::get(const attr_t & attr_ref, const uint32_t fix_addr, std::vector<AddrPair>& match_pairs)
 {
 	auto res = mPrimaryIndexTable.find(attr_ref);
@@ -175,6 +208,17 @@ uint32_t PrimaryIndexFile::get_not(const attr_t & attr_ref, std::vector<uint32_t
 	}
 
 	return match_addrs.size();
+}
+
+uint32_t PrimaryIndexFile::get_not(const attr_t & attr_ref, std::vector<AddrPair>& match_pairs)
+{
+	for (auto it = mPrimaryIndexTable.begin(); it != mPrimaryIndexTable.end(); it++)
+	{
+		if (!(it->first == attr_ref))
+			match_pairs.emplace_back(it->second, it->second);
+	}
+
+	return match_pairs.size();
 }
 
 uint32_t PrimaryIndexFile::get_not(const attr_t & attr_ref, const uint32_t fix_addr, std::vector<AddrPair>& match_pairs)
@@ -278,6 +322,18 @@ uint32_t TreeIndexFile::get(const attr_t & attr_ref, std::vector<uint32_t>& matc
 	return match_addrs.size();
 }
 
+uint32_t TreeIndexFile::get(const attr_t & attr_ref, std::vector<AddrPair>& match_pairs)
+{
+	auto range = mTreeIndexTable.equal_range(attr_ref);
+	TreeIndexTable::iterator begin = range.first;
+	TreeIndexTable::iterator end = range.second;
+
+	for (auto it = begin; it != end; it++)
+		match_pairs.emplace_back(it->second, it->second);
+
+	return match_pairs.size();
+}
+
 uint32_t TreeIndexFile::get(const attr_t & attr_ref, const relation_type_t rel_type, std::vector<uint32_t>& match_addrs)
 {
 	switch (rel_type)
@@ -321,6 +377,20 @@ uint32_t TreeIndexFile::get_not(const attr_t & attr_ref, std::vector<uint32_t>& 
 	return match_addrs.size();
 }
 
+uint32_t TreeIndexFile::get_not(const attr_t & attr_ref, std::vector<AddrPair> & match_pairs)
+{
+	auto range = mTreeIndexTable.equal_range(attr_ref);
+	TreeIndexTable::iterator begin = range.first;
+	TreeIndexTable::iterator end = range.second;
+
+	for (auto it = mTreeIndexTable.begin(); it != begin; it++)
+		match_pairs.emplace_back(it->second, it->second);
+	for (auto it = end; it != mTreeIndexTable.end(); it++)
+		match_pairs.emplace_back(it->second, it->second);
+
+	return match_pairs.size();
+}
+
 uint32_t TreeIndexFile::get_not(const attr_t & attr_ref, const uint32_t fix_addr, std::vector<AddrPair>& match_pairs)
 {
 	auto range = mTreeIndexTable.equal_range(attr_ref);
@@ -347,6 +417,16 @@ uint32_t TreeIndexFile::get_less(const attr_t & attr_ref, std::vector<uint32_t>&
 	return match_addrs.size();
 }
 
+uint32_t TreeIndexFile::get_less(const attr_t & attr_ref, std::vector<AddrPair>& match_pairs)
+{
+	TreeIndexTable::iterator begin = mTreeIndexTable.begin();
+	TreeIndexTable::iterator end = mTreeIndexTable.lower_bound(attr_ref);
+	for (auto it = begin; it != end; it++)
+		match_pairs.emplace_back(it->second, it->second);
+
+	return match_pairs.size();
+}
+
 uint32_t TreeIndexFile::get_less(const attr_t & attr_ref, const uint32_t fix_addr, std::vector<AddrPair>& match_pairs)
 {
 	TreeIndexTable::iterator begin = mTreeIndexTable.begin();
@@ -365,6 +445,16 @@ uint32_t TreeIndexFile::get_large(const attr_t & attr_ref, std::vector<uint32_t>
 		match_addrs.emplace_back(it->second);
 
 	return match_addrs.size();
+}
+
+uint32_t TreeIndexFile::get_large(const attr_t & attr_ref, std::vector<AddrPair>& match_pairs)
+{
+	TreeIndexTable::iterator begin = mTreeIndexTable.upper_bound(attr_ref);
+	TreeIndexTable::iterator end = mTreeIndexTable.end();
+	for (auto it = begin; it != end; it++)
+		match_pairs.emplace_back(it->second, it->second);
+
+	return match_pairs.size();
 }
 
 uint32_t TreeIndexFile::get_large(const attr_t & attr_ref, const uint32_t fix_addr, std::vector<AddrPair>& match_pairs)
@@ -511,6 +601,31 @@ void TreeIndexFile::merge_large(const TreeIndexFile & a, const TreeIndexFile & b
 			match_pairs.emplace_back(ait->second, bit->second);
 	}
 #else
+	//auto ait = a.mTreeIndexTable.begin();
+	//auto bit = b.mTreeIndexTable.begin();
+	//auto a_end = a.mTreeIndexTable.end();
+	//auto b_end = b.mTreeIndexTable.end();
+
+	//while (ait != a_end && bit != b_end)
+	//{
+	//	if (bit->first == ait->first)
+	//	{
+	//		ait++;
+	//	}
+	//	else if (bit->first < ait->first)
+	//	{
+	//		auto temp_ait = ait;
+	//		while (temp_ait != a_end && bit->first < temp_ait->first)
+	//		{
+	//			match_pairs.emplace_back(temp_ait->second, bit->second);
+	//			temp_ait++;
+	//		}
+	//		bit++;
+	//	}
+	//	else
+	//		ait++;
+	//}
+
 	auto ait = a.mTreeIndexTable.begin();
 	auto bit = b.mTreeIndexTable.begin();
 	auto a_end = a.mTreeIndexTable.end();
@@ -518,22 +633,22 @@ void TreeIndexFile::merge_large(const TreeIndexFile & a, const TreeIndexFile & b
 
 	while (ait != a_end && bit != b_end)
 	{
-		if (bit->first == ait->first)
+		if (ait->first == bit->first)
 		{
+			auto temp_bit = b.mTreeIndexTable.begin();
+			while (temp_bit != bit && ait->first > temp_bit->first)
+			{
+				match_pairs.emplace_back(ait->second, temp_bit->second);
+				temp_bit++;
+			}
 			ait++;
 		}
-		else if (bit->first < ait->first)
+		else if (ait->first < bit->first)
 		{
-			auto temp_ait = ait;
-			while (temp_ait != a_end && bit->first < temp_ait->first)
-			{
-				match_pairs.emplace_back(temp_ait->second, bit->second);
-				temp_ait++;
-			}
-			bit++;
+			ait++;
 		}
 		else
-			ait++;
+			bit++;
 	}
 #endif
 }

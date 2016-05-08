@@ -6,6 +6,7 @@
 #define BIT_HAS_HASH 0x1
 #define BIT_HAS_TREE 0x2
 
+#define TABLE_COMB_ERROR 0x45
 
 std::ostream &operator <<(std::ostream &os, const AttrTuple tuple)
 {
@@ -40,11 +41,11 @@ LightTable::~LightTable()
 	2. Merge join (require two treeindex)
 	3. Naive join (wrost case, nested loop)
 */
-void LightTable::join(
+std::pair<LightTable *, LightTable *> LightTable::join_cross(
 	LightTable & a, 
 	std::string a_keyname, 
 	relation_type_t rel_type, 
-	LightTable & b, 
+	LightTable & b,
 	std::string b_keyname,
 	std::vector<AddrPair> &match_pairs)
 {
@@ -76,15 +77,15 @@ void LightTable::join(
 		// 2. Tree join
 		// 3. Naive
 		if ((b_stat & BIT_HAS_HASH))
-			join_hash(a, a_keyname, a_index_file, 
+			cross_hash_join(a, a_keyname, a_index_file, 
 				rel_type, 
 				b, b_keyname, b_index_file, match_pairs);
 		else if ((a_stat & BIT_HAS_TREE) && (b_stat & BIT_HAS_TREE))
-			join_two_tree(a, a_keyname, a_index_file,
+			cross_two_tree_join(a, a_keyname, a_index_file,
 				rel_type,
 				b, b_keyname, b_index_file, match_pairs);
 		else
-			join_naive(a, a_keyname,
+			cross_naive_join(a, a_keyname,
 				rel_type,
 				b, b_keyname,
 				match_pairs);
@@ -94,15 +95,15 @@ void LightTable::join(
 		// 2. b has tree
 		// 3. Naive
 		if ((a_stat & BIT_HAS_TREE) && (b_stat & BIT_HAS_TREE))
-			join_two_tree(a, a_keyname, a_index_file,
+			cross_two_tree_join(a, a_keyname, a_index_file,
 				rel_type,
 				b, b_keyname, b_index_file, match_pairs);
 		else if ((b_stat & BIT_HAS_TREE))
-			join_one_tree(a, a_keyname, a_index_file,
+			cross_one_tree_join(a, a_keyname, a_index_file,
 				rel_type,
 				b, b_keyname, b_index_file, match_pairs);
 		else
-			join_naive(a, a_keyname,
+			cross_naive_join(a, a_keyname,
 				rel_type,
 				b, b_keyname,
 				match_pairs);
@@ -110,52 +111,163 @@ void LightTable::join(
 	default:
 		throw exception_t(UNKNOWN_RELATION, "Unknown relation type.");
 	}
+	return std::pair<LightTable *, LightTable *>(&a, &b);
 }
 
-void LightTable::join(
-	LightTable & table, std::string table_keyname, 
-	relation_type_t rel_type, attr_t & kAttr, 
-	LightTable & onto_table,
-	std::vector<AddrPair> & match_pairs)
-{
-	std::vector<uint32_t> match_addrs;
-	match_addrs.reserve(table.size());
-	
-	table.filter(table_keyname.c_str(), kAttr, rel_type, match_addrs);
-	map(match_addrs, onto_table, match_pairs);
-}
-
-void LightTable::select(
-	LightTable & a, std::vector<std::string>& a_select_attr_names, 
-	LightTable & b, std::vector<std::string>& b_select_attr_names, 
+std::pair<LightTable *, LightTable *> LightTable::join_self(
+	LightTable & table, 
+	std::string key1, 
+	relation_type_t rel_type,
+	std::string key2, 
 	std::vector<AddrPair>& match_pairs)
 {
-	// In-Tuple id
-	std::vector<int> a_select_ids;
-	std::vector<int> b_select_ids;
+	int id1 = table.get_attr_id(key1);
+	int id2 = table.get_attr_id(key2);
 
-	a.get_selectid_from_names(a_select_attr_names, a_select_ids);
-	b.get_selectid_from_names(b_select_attr_names, b_select_ids);
-
-	for (std::vector<AddrPair>::iterator it = match_pairs.begin(); it != match_pairs.end(); it++)
+	switch (rel_type)
 	{
-		// Tuple id
-		int a_id = it->first;
-		int b_id = it->second;
-		
-		const AttrTuple &a_tuple = a.get_tuple(a_id);
-		for (int tuple_element_id : a_select_ids)
+	case EQ:
+	{
+		for (auto it = table.begin(); it != table.end(); it++)
 		{
-			std::cout << a_tuple[tuple_element_id] << "\t";
+			uint32_t addr = it - table.begin();
+			if (it->at(id1) == it->at(id2))
+				match_pairs.emplace_back(addr, addr);
 		}
-
-		const AttrTuple &b_tuple = b.get_tuple(b_id);
-		for (int tuple_element_id : b_select_ids)
-		{
-			std::cout << b_tuple[tuple_element_id] << "\t";
-		}
-		std::cout << "\n";
+		break;
 	}
+	case NEQ:
+	{
+		for (auto it = table.begin(); it != table.end(); it++)
+		{
+			uint32_t addr = it - table.begin();
+			if (it->at(id1) != it->at(id2))
+				match_pairs.emplace_back(addr, addr);
+		}
+		break;
+	}
+	case LESS:
+	{
+		for (auto it = table.begin(); it != table.end(); it++)
+		{
+			uint32_t addr = it - table.begin();
+			if (it->at(id1) < it->at(id2))
+				match_pairs.emplace_back(addr, addr);
+		}
+		break;
+	}
+	case LARGE:
+	{
+		for (auto it = table.begin(); it != table.end(); it++)
+		{
+			uint32_t addr = it - table.begin();
+			if (it->at(id1) > it->at(id2))
+				match_pairs.emplace_back(addr, addr);
+		}
+		break;
+	}
+	default:
+		throw exception_t(UNKNOWN_RELATION, "Unknown relation type.");
+	}
+	return std::pair<LightTable *, LightTable *>(&table, &table);
+}
+
+std::pair<LightTable *, LightTable *> LightTable::join_self(
+	LightTable & table, 
+	std::string key, 
+	relation_type_t rel_type, 
+	attr_t & kAttr, 
+	std::vector<AddrPair>& match_pairs)
+{
+	uint8_t stat = 0x0;
+	IndexFile *index = table.get_index_file(key.c_str());
+	if (index != NULL)
+	{
+		IndexType type = index->type();
+		stat = (type == HASH || type == PHASH) ? BIT_HAS_HASH :
+			(type == TREE || type == PTREE) ? BIT_HAS_TREE : 0;
+	}
+	
+	int attr_id = table.get_attr_id(key);
+
+	switch (rel_type)
+	{
+	case EQ:
+		if ((stat & BIT_HAS_HASH) || (stat & BIT_HAS_TREE))
+		{
+			index->get(kAttr, match_pairs);
+		}
+		else
+		{
+			auto begin = table.begin();
+			for (auto it = table.begin(); it != table.end(); it++)
+			{
+				if (it->at(attr_id) == kAttr)
+				{
+					uint32_t addr = it - begin;
+					match_pairs.emplace_back(addr, addr);
+				}
+			}
+		}
+		break;
+	case NEQ:
+		if ((stat & BIT_HAS_HASH) || (stat & BIT_HAS_TREE))
+		{
+			index->get_not(kAttr, match_pairs);
+		}
+		else
+		{
+			auto begin = table.begin();
+			for (auto it = table.begin(); it != table.end(); it++)
+			{
+				if (it->at(attr_id) != kAttr)
+				{
+					uint32_t addr = it - begin;
+					match_pairs.emplace_back(addr, addr);
+				}
+			}
+		}
+		break;
+	case LESS:
+		if ((stat & BIT_HAS_TREE))
+		{
+			((TreeIndexFile*)index)->get_less(kAttr, match_pairs);
+		}
+		else
+		{
+			auto begin = table.begin();
+			for (auto it = table.begin(); it != table.end(); it++)
+			{
+				if (it->at(attr_id) < kAttr)
+				{
+					uint32_t addr = it - begin;
+					match_pairs.emplace_back(addr, addr);
+				}
+			}
+		}
+		break;
+	case LARGE:
+		if ((stat & BIT_HAS_TREE))
+		{
+			((TreeIndexFile*)index)->get_large(kAttr, match_pairs);
+		}
+		else
+		{
+			auto begin = table.begin();
+			for (auto it = table.begin(); it != table.end(); it++)
+			{
+				if (it->at(attr_id) > kAttr)
+				{
+					uint32_t addr = it - begin;
+					match_pairs.emplace_back(addr, addr);
+				}
+			}
+		}
+		break;
+	default:
+		throw exception_t(UNKNOWN_RELATION, "Unknown relation type.");
+	}
+	return std::pair<LightTable *, LightTable *>(&table, &table);
 }
 
 void LightTable::create(const char * tablename, AttrDesc * descs, int num)
@@ -265,6 +377,11 @@ int LightTable::get_attr_id(std::string attr_name)
 	return key_id;
 }
 
+bool LightTable::has_attr(std::string attr_name)
+{
+	return mTablefile.get_attr_id(attr_name.c_str()) >= 0;
+}
+
 uint32_t LightTable::size()
 {
 	return mDatafile.size();
@@ -273,6 +390,24 @@ uint32_t LightTable::size()
 void LightTable::dump()
 {
 	mTablefile.dump_info();
+}
+
+void LightTable::dump(LightTable & a, LightTable & b, std::vector<AddrPair>& match_pairs)
+{
+	for (auto pair : match_pairs)
+	{
+		uint32_t addr_a = pair.first;
+		uint32_t addr_b = pair.second;
+
+		auto ta = a.get_tuple(addr_a);
+		auto tb = b.get_tuple(addr_b);
+
+		for (auto e : ta)
+			std::cout << e << '\t';
+		for ( auto e : tb)
+			std::cout << e << '\t';
+		std::cout << "\n";
+	}
 }
 
 AttrTupleIterator LightTable::begin()
@@ -444,7 +579,7 @@ void LightTable::get_selectid_from_names(std::vector<std::string>& names, std::v
 	always use a to iter, b to index
 
 */
-inline void LightTable::join_hash(
+inline void LightTable::cross_hash_join(
 	LightTable & a, std::string a_keyname, IndexFile * a_index,
 	relation_type_t rel_type, 
 	LightTable & b, std::string b_keyname, IndexFile * b_index,
@@ -458,49 +593,49 @@ inline void LightTable::join_hash(
 	switch (rel_type)
 	{
 	case EQ:
-		hashjoin(&a, a_key_id, &b, b_index, match_pairs);
+		cross_hash_join_eq(a, a_key_id, b, b_index, match_pairs);
 		break;
 	case NEQ:
-		hashjoin_not(&a, a_key_id, &b, b_index, match_pairs);
+		cross_hash_join_neq(a, a_key_id, b, b_index, match_pairs);
 		break;
 	default:
 		assert(false); // Hash index only support EQ, NEQ
 	}
 }
 
-inline void LightTable::hashjoin(
-	LightTable *iter_table,
+inline void LightTable::cross_hash_join_eq(
+	LightTable & iter_table,
 	int iter_key_id,
-	LightTable *fix_table, 
+	LightTable & fix_table, 
 	IndexFile * fix_index, 
 	std::vector<AddrPair>& match_pairs)
 {
-	for (auto it = iter_table->begin(); it != iter_table->end(); it++)
+	for (auto it = iter_table.begin(); it != iter_table.end(); it++)
 	{
-		uint32_t iter_addr = it - iter_table->begin();
+		uint32_t iter_addr = it - iter_table.begin();
 		attr_t & iter_key_attr = it->at(iter_key_id);
 
 		fix_index->get(iter_key_attr, iter_addr, match_pairs);
 	}
 }
 
-inline void LightTable::hashjoin_not(
-	LightTable * iter_table,
+inline void LightTable::cross_hash_join_neq(
+	LightTable & iter_table,
 	int iter_key_id, 
-	LightTable * fix_table, 
+	LightTable & fix_table, 
 	IndexFile * fix_index, 
 	std::vector<AddrPair>& match_pairs)
 {
-	for (auto it = iter_table->begin(); it != iter_table->end(); it++)
+	for (auto it = iter_table.begin(); it != iter_table.end(); it++)
 	{
-		uint32_t iter_addr = it - iter_table->begin();
+		uint32_t iter_addr = it - iter_table.begin();
 		attr_t & iter_key_attr = it->at(iter_key_id);
 
 		fix_index->get_not(iter_key_attr, iter_addr, match_pairs);
 	}
 }
 
-void LightTable::join_two_tree(
+void LightTable::cross_two_tree_join(
 	LightTable & a, std::string a_keyname, IndexFile * a_index,
 	relation_type_t rel_type, 
 	LightTable & b, std::string b_keyname, IndexFile * b_index,
@@ -511,6 +646,7 @@ void LightTable::join_two_tree(
 	const TreeIndexFile &ta = static_cast<TreeIndexFile&>(*a_index);
 	const TreeIndexFile &tb = static_cast<TreeIndexFile&>(*b_index);
 
+	// if tb if null, map ta to null space
 	switch (rel_type)
 	{
 	case EQ:
@@ -531,7 +667,7 @@ void LightTable::join_two_tree(
 	
 }
 
-inline void LightTable::join_one_tree(
+inline void LightTable::cross_one_tree_join(
 	LightTable & a, std::string a_keyname, IndexFile * a_index, 
 	relation_type_t rel_type,
 	LightTable & b, std::string b_keyname, IndexFile * b_index, 
@@ -540,7 +676,7 @@ inline void LightTable::join_one_tree(
 	assert(b_index != NULL && b_index->type() == TREE);
 	
 	TreeIndexFile &tindex = static_cast<TreeIndexFile&>(*b_index);
-	LightTable &iter_table = a;
+	LightTable & iter_table = a;
 
 	int iter_key_id = a.mTablefile.get_attr_id(a_keyname.c_str());
 	//int b_key_id = b.mTablefile.get_attr_id(b_keyname.c_str());
@@ -586,18 +722,37 @@ inline void LightTable::join_one_tree(
 
 inline void LightTable::map(
 	std::vector<uint32_t>& addrs, 
-	LightTable & onto_table, 
+	LightTable * onto_table, 
 	std::vector<AddrPair>& match_pairs)
 {
-	auto begin = onto_table.begin();
-	auto end = onto_table.end();
+	if (onto_table == NULL)
+	{
+		for (uint32_t addr : addrs)
+			match_pairs.emplace_back(addr, 0);
+	}
+	else
+	{
+		auto begin = onto_table->begin();
+		auto end = onto_table->end();
 
-	for (uint32_t addr : addrs)
-		for (auto it = begin; it != end; it++)
-			match_pairs.emplace_back(addr, it - begin);
+		for (uint32_t addr : addrs)
+			for (auto it = begin; it != end; it++)
+				match_pairs.emplace_back(addr, it - begin);
+	}
+
 }
 
-void LightTable::join_naive(
+inline void LightTable::product(
+	LightTable * a, 
+	LightTable * b, 
+	std::vector<AddrPair>& match_pairs)
+{
+	for (auto ait = a->begin(); ait != a->end(); ait++)
+		for (auto bit = b->begin(); bit != b->end(); bit++)
+			match_pairs.emplace_back(ait - a->begin(), bit - b->begin());
+}
+
+void LightTable::cross_naive_join(
 	LightTable & a, std::string a_keyname, 
 	relation_type_t rel_type, 
 	LightTable & b, std::string b_keyname,
@@ -655,8 +810,10 @@ void LightTable::merge(
 	std::vector<AddrPair> & b,
 	std::vector<AddrPair> & c)
 {
-	std::sort(a.begin(), a.end());
-	std::sort(b.begin(), b.end());
+	if(a.begin() != a.end())
+		std::sort(a.begin(), a.end());
+	if(b.begin() != b.end())
+		std::sort(b.begin(), b.end());
 
 	std::vector<AddrPair>::iterator it;
 
@@ -675,4 +832,100 @@ void LightTable::merge(
 	}
 	
 	c.resize(it - c.begin());
+}
+
+std::pair<LightTable *, LightTable *> LightTable::merge(
+	std::pair<LightTable *, LightTable *> a_comb,
+	std::vector<AddrPair>& a, 
+	merge_type_t merge_type, 
+	std::pair<LightTable *, LightTable *> b_comb,
+	std::vector<AddrPair>& b, 
+	std::vector<AddrPair>& c)
+{
+	assert(a_comb.first != NULL && a_comb.second != NULL);
+	assert(b_comb.first != NULL && b_comb.second != NULL);
+
+	// AB AB (no AB, BA for now) => AB
+	bool a_reflex = a_comb.first == a_comb.second;
+	bool b_reflex = b_comb.first == b_comb.second;
+
+	if (!a_reflex && !b_reflex)
+	{
+		if (a_comb.first != b_comb.first)
+			throw exception_t(TABLE_COMB_ERROR, "Table combination error, no AB, BA");
+		merge(a, merge_type, b, c);
+		return std::pair<LightTable *, LightTable *>(a_comb.first, a_comb.second);
+	}
+	else if(a_reflex && b_reflex)
+	{
+		// AA, AA => AA
+		if (a_comb.first == b_comb.first)
+		{
+			merge(a, merge_type, b, c);
+			return std::pair<LightTable *, LightTable *>( a_comb.first , a_comb.first );
+		}
+		else
+		{
+			// AA BB => AB
+			std::vector<AddrPair> exp_a, exp_b;
+			exp_a.reserve(a.size());
+			exp_b.reserve(b.size());
+
+			auto a_begin = a_comb.first->begin();
+			auto b_begin = b_comb.first->begin();
+			auto a_end = a_comb.second->end();
+			auto b_end = b_comb.second->end();
+
+			for (auto ait = a.begin(); ait != a.end(); ait++)
+				for (auto bit = b_begin; bit != b_end; bit++)
+					exp_a.emplace_back(ait->first, bit - b_begin);
+
+			for (auto bit = b.begin(); bit != b.end(); bit++)
+				for (auto ait = a_begin; ait != a_end; ait++)
+					exp_b.emplace_back(bit->first, ait - a_begin);
+
+			merge(exp_a, merge_type, exp_b, c);
+			return std::pair<LightTable *, LightTable *>( a_comb.first , b_comb.second );
+		}
+	}
+	else if (a_reflex)
+	{
+		// AA AB => AB
+		if(b_comb.second == a_comb.first)
+			throw exception_t(TABLE_COMB_ERROR, "Table combination error, no AA, BA");
+
+		std::vector<AddrPair> exp_a;
+		exp_a.reserve(a.size());
+
+		auto b_begin = b_comb.second->begin();
+		auto b_end = b_comb.second->end();
+
+		for (auto ait = a.begin(); ait != a.end(); ait++)
+			for (auto bit = b_begin; bit != b_end; bit++)
+				exp_a.emplace_back(ait->first, bit - b_begin);
+
+		merge(exp_a, merge_type, b, c);
+
+		return std::pair<LightTable *, LightTable *>( a_comb.first , b_comb.second );
+	}
+	else
+	{
+		// AB BB
+		if (b_comb.second == a_comb.first)
+			throw exception_t(TABLE_COMB_ERROR, "Table combination error, no BA, BB");
+
+		std::vector<AddrPair> exp_b;
+		exp_b.reserve(b.size());
+
+		auto a_begin = a_comb.first->begin();
+		auto a_end = a_comb.first->end();
+
+		for (auto bit = b.begin(); bit != b.end(); bit++)
+			for (auto ait = a_comb.first->begin(); ait != a_end; ait++)
+				exp_b.emplace_back(bit->first, ait - a_begin);
+
+		merge(a, merge_type, exp_b, c);
+		 
+		return std::pair<LightTable *, LightTable *>(a_comb.first , b_comb.first );
+	}
 }

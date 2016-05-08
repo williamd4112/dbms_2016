@@ -29,56 +29,71 @@ public:
 	LightTable();
 	~LightTable();
 
-	static void join(
-		LightTable &a,
+	// Cross join
+	static std::pair<LightTable *, LightTable *> join_cross(
+		LightTable & a,
 		std::string a_keyname,
 		relation_type_t rel_type,
-		LightTable &b,
+		LightTable & b,
 		std::string b_keyname,
 		std::vector<AddrPair> &match_pairs);
 
-	static void join(
-		LightTable &table,
-		std::string table_keyname,
+	// Self join (Generate a reflexive pair)
+	static std::pair<LightTable *, LightTable *> join_self(
+		LightTable & table, 
+		std::string key1, 
+		relation_type_t rel_type, 
+		std::string key2, 
+		std::vector<AddrPair> &match_pairs);
+
+	static std::pair<LightTable *, LightTable *> join_self(
+		LightTable & table,
+		std::string key,
 		relation_type_t rel_type,
 		attr_t & kAttr,
-		LightTable & onto_table,
+		std::vector<AddrPair> &match_pairs);
+
+	static std::pair<LightTable *, LightTable *> merge(
+		std::pair<LightTable *, LightTable *> a_comb,
+		std::vector<AddrPair>& a,
+		merge_type_t merge_type,
+		std::pair<LightTable *, LightTable *> b_comb,
+		std::vector<AddrPair>& b,
+		std::vector<AddrPair>& c);
+
+	static inline void map(
+		std::vector<uint32_t> & addrs,
+		LightTable * onto_table,
+		std::vector<AddrPair> & match_pairs
+	);
+
+	static inline void product(
+		LightTable *a, 
+		LightTable *b, 
 		std::vector<AddrPair> & match_pairs);
 
-	static void join_naive(
-		LightTable &a,
-		std::string a_keyname,
-		relation_type_t rel_type,
-		LightTable &b,
-		std::string b_keyname,
-		std::vector<AddrPair> &match_pairs);
-
-	static void merge(
-		std::vector<AddrPair> &a,
-		merge_type_t merge_type, 
-		std::vector<AddrPair> &b,
-		std::vector<AddrPair> & c);
-
-	static void select(
-		LightTable &a,
-		std::vector<std::string> &a_select_attr_names,
-		LightTable &b,
-		std::vector<std::string> &b_select_attr_names,
-		std::vector<AddrPair> &match_pairs);
-
 	void create(const char *tablename, AttrDesc *descs, int num);
+	void create_index(const char *attr_name, IndexType type);
+
 	void load(const char *tablename);
 	void save();
 
-	void create_index(const char *attr_name, IndexType type);
 	void insert(AttrTuple &tuple);
-	uint32_t filter(const char *attr_name, attr_t & attr, relation_type_t find_type, std::vector<uint32_t> & match_addrs);
+
+	uint32_t filter(
+		const char *attr_name, 
+		attr_t & attr, 
+		relation_type_t find_type, 
+		std::vector<uint32_t> & match_addrs);
 	
 	AttrTuple &get_tuple(uint32_t index);
 	int get_attr_id(std::string attr_name);
+	bool has_attr(std::string attr_name);
 	uint32_t size();
+	std::string name() { return mTablename; }
 
 	void dump();
+	static void dump(LightTable & a, LightTable & b, std::vector<AddrPair> & match_pairs);
 
 	AttrTupleIterator begin();
 	AttrTupleIterator end();
@@ -90,61 +105,88 @@ private:
 
 	inline uint32_t insert_with_pk(AttrTuple &tuple);
 	inline uint32_t insert_no_pk(AttrTuple &tuple);
+	
 	inline void update_index(AttrTuple &tuple, uint32_t addr);
-	uint32_t filter_with_index(const char *attr_name, attr_t & attr, relation_type_t find_type, IndexFile *index_file, std::vector<uint32_t> & match_addrs);
-	uint32_t filter_naive(const char *attr_name, attr_t & attr, relation_type_t rel_type, std::vector<uint32_t> & match_addrs);
+	
+	uint32_t filter_with_index(
+		const char *attr_name, 
+		attr_t & attr, 
+		relation_type_t find_type, 
+		IndexFile *index_file,
+		std::vector<uint32_t> & match_addrs);
+
+	uint32_t filter_naive(
+		const char *attr_name, 
+		attr_t & attr,
+		relation_type_t find_type, 
+		std::vector<uint32_t> & match_addrs);
+	
 	inline IndexFile *get_index_file(const char *name);
 	inline void init_seq_types(AttrDesc *descs, int num);
 	void get_selectid_from_names(std::vector<std::string> &names, std::vector<int> &ids);
 
-	static inline void join_hash(
-		LightTable &a,
+	static void cross_naive_join(
+		LightTable & a,
+		std::string a_keyname,
+		relation_type_t rel_type,
+		LightTable & b,
+		std::string b_keyname,
+		std::vector<AddrPair> &match_pairs);
+
+	static inline void cross_hash_join(
+		LightTable & a,
 		std::string a_keyname,
 		IndexFile *a_index,
 		relation_type_t rel_type,
-		LightTable &b,
+		LightTable & b,
 		std::string b_keyname,
 		IndexFile *b_index,
 		std::vector<AddrPair> &match_pairs);
-	
-	static inline void hashjoin(
-		LightTable *iter_table,
+
+	static inline void LightTable::cross_hash_join_eq(
+		LightTable & iter_table,
 		int iter_key_id,
-		LightTable *fix_table,
-		IndexFile *fix_index,
-		std::vector<AddrPair> &match_pairs);
+		LightTable & fix_table,
+		IndexFile * fix_index,
+		std::vector<AddrPair>& match_pairs);
 
-	static inline void hashjoin_not(
-		LightTable *iter_table,
+	static inline void LightTable::cross_hash_join_neq(
+		LightTable & iter_table,
 		int iter_key_id,
-		LightTable *fix_table,
-		IndexFile *fix_index,
-		std::vector<AddrPair> &match_pairs);
+		LightTable & fix_table,
+		IndexFile * fix_index,
+		std::vector<AddrPair>& match_pairs);
 
-	static inline void join_two_tree(
-		LightTable &a,
+	static inline void cross_two_tree_join(
+		LightTable & a,
 		std::string a_keyname,
 		IndexFile *a_index,
+		
 		relation_type_t rel_type,
-		LightTable &b,
+		
+		LightTable & b,
 		std::string b_keyname,
 		IndexFile *b_index,
+		
 		std::vector<AddrPair> &match_pairs);
 
-	static inline void join_one_tree(
-		LightTable &a,
+	static inline void cross_one_tree_join(
+		LightTable & a,
 		std::string a_keyname,
 		IndexFile *a_index,
+
 		relation_type_t rel_type,
-		LightTable &b,
+		
+		LightTable & b,
 		std::string b_keyname,
 		IndexFile *b_index,
+		
 		std::vector<AddrPair> &match_pairs);
 
-	static inline void map(
-		std::vector<uint32_t> & addrs,
-		LightTable & onto_table,
-		std::vector<AddrPair> & match_pairs
-	);
+	static void merge(
+		std::vector<AddrPair> &a,
+		merge_type_t merge_type,
+		std::vector<AddrPair> &b,
+		std::vector<AddrPair> & c);
 };
 

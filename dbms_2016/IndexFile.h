@@ -41,9 +41,12 @@ public:
 	~IndexFile();
 
 	virtual bool set(const attr_t &attr_ref, const uint32_t record_addr) = 0;
-	virtual uint32_t get(const attr_t &attr_ref, std::vector<uint32_t> &match_addrs) = 0;
-	virtual uint32_t get(const attr_t &attr_ref, const uint32_t fix_addr, std::vector<AddrPair> &match_pairs) = 0;
+	virtual uint32_t get(const attr_t &attr_ref, std::vector<uint32_t> &match_addrs) = 0; // Filter
+	virtual uint32_t get(const attr_t &attr_ref, std::vector<AddrPair> &match_pairs) = 0; // Reflexive
+	virtual uint32_t get(const attr_t &attr_ref, const uint32_t fix_addr, std::vector<AddrPair> &match_pairs) = 0; // Cross filter
+
 	virtual uint32_t get_not(const attr_t &attr_ref, std::vector<uint32_t> &match_addrs) = 0;
+	virtual uint32_t get_not(const attr_t &attr_ref, std::vector<AddrPair> &match_pairs) = 0; // Reflexive
 	virtual uint32_t get_not(const attr_t &attr_ref, const uint32_t fix_addr, std::vector<AddrPair> &match_pairs) = 0;
 
 	const IndexType type() const { return mType; }
@@ -62,9 +65,11 @@ public:
 
 	bool set(const attr_t &attr_ref, const uint32_t record_addr);
 	uint32_t get(const attr_t &attr_ref, std::vector<uint32_t> &match_addrs);
+	uint32_t get(const attr_t &attr_ref, std::vector<AddrPair> &match_pairs);
 	uint32_t get(const attr_t &attr_ref, const uint32_t fix_addr, std::vector<AddrPair> &match_pairs);
 
 	uint32_t get_not(const attr_t &attr_ref, std::vector<uint32_t> &match_addrs);
+	uint32_t get_not(const attr_t &attr_ref, std::vector<AddrPair> &match_pairs);
 	uint32_t get_not(const attr_t &attr_ref, const uint32_t fix_addr, std::vector<AddrPair> &match_pairs);
 
 	void write_back();
@@ -84,17 +89,21 @@ public:
 
 	bool set(const attr_t &attr_ref, const uint32_t record_addr);
 	uint32_t get(const attr_t &attr_ref, std::vector<uint32_t> &match_addrs);
+	uint32_t get(const attr_t &attr_ref, std::vector<AddrPair> &match_pairs);
 	uint32_t get(const attr_t &attr_ref, const relation_type_t rel_type, std::vector<uint32_t> &match_addrs);
 	uint32_t get(const attr_t &attr_ref, const uint32_t fix_addr, std::vector<AddrPair> &match_pairs);
 
 	uint32_t get_not(const attr_t &attr_ref, std::vector<uint32_t> &match_addrs);
+	uint32_t get_not(const attr_t &attr_ref, std::vector<AddrPair> &match_pairs);
 	uint32_t get_not(const attr_t &attr_ref, const uint32_t fix_addr, std::vector<AddrPair> &match_pairs);
 
 	uint32_t get_less(const attr_t &attr_ref, std::vector<uint32_t> &match_addrs);
+	uint32_t get_less(const attr_t &attr_ref, std::vector<AddrPair> &match_pairs);
 	uint32_t get_less(const attr_t &attr_ref, const uint32_t fix_addr, std::vector<AddrPair> &match_pairs);
 
 	uint32_t get_large(const attr_t &attr_ref, std::vector<uint32_t> &match_addrs);
 	uint32_t get_large(const attr_t &attr_ref, const uint32_t fix_addr, std::vector<AddrPair> &match_pairs);
+	uint32_t get_large(const attr_t &attr_ref, std::vector<AddrPair> &match_pairs);
 
 	void write_back();
 	void read_from();
@@ -118,9 +127,11 @@ public:
 
 	bool set(const attr_t &attr_ref, const uint32_t record_addr);
 	uint32_t get(const attr_t &attr_ref, std::vector<uint32_t> &match_addrs);
+	uint32_t get(const attr_t &attr_ref, std::vector<AddrPair> &match_pairs);
 	uint32_t get(const attr_t &attr_ref, const uint32_t fix_addr, std::vector<AddrPair> &match_pairs);
 
 	uint32_t get_not(const attr_t &attr_ref, std::vector<uint32_t> &match_addrs);
+	uint32_t get_not(const attr_t &attr_ref, std::vector<AddrPair> &match_pairs);
 	uint32_t get_not(const attr_t &attr_ref, const uint32_t fix_addr, std::vector<AddrPair> &match_pairs);
 
 	bool get_primary(const attr_t &attr_ref, uint32_t *match_addr);

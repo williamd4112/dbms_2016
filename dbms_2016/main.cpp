@@ -101,7 +101,7 @@ void test_lite_table_join()
 	};
 
 	t1.create("table1", t1_descs, 4);
-	t1.create_index("Name", TREE);
+	t1.create_index("Name", HASH);
 	t1.create_index("Grade", TREE);
 
 	AttrTuple t1_tuple(4);
@@ -113,22 +113,22 @@ void test_lite_table_join()
 		t1_tuple[0] = i;
 		t1_tuple[1] = name;
 		t1_tuple[2] = addr;
-		t1_tuple[3] = i * 10;
+		t1_tuple[3] = i;
 		t1.insert(t1_tuple);
 	}
 
 	AttrTuple t2_tuple(3);
 	char bookname[40];
 	t2.create("table2", t2_descs, 3);
-	t2.create_index("BookName", TREE);
+	t2.create_index("BookName", HASH);
 	t2.create_index("BookGrade", TREE);
 
-	for (int i = 0; i < 1000; i++)
+	for (int i = 0; i < 10; i++)
 	{
 		sprintf(bookname, "Name%d", i);
 		t2_tuple[0] = i;
 		t2_tuple[1] = bookname;
-		t2_tuple[2] = (i % 1000) * 10;
+		t2_tuple[2] = (i % 10);
 		t2.insert(t2_tuple);
 	}
 }
@@ -143,7 +143,7 @@ void test_join_naive()
 	std::vector<AddrPair> match_addrs_name;
 	std::vector<AddrPair> matchs;
 
-	LightTable::join_naive(t1, "Grade", EQ, t2, "BookGrade", match_addrs_id);
+	//LightTable::join_naive(t1, "Grade", EQ, t2, "BookGrade", match_addrs_id);
 	//LightTable::join(t1, "Name", EQ, t2, "BookName", match_addrs_name);
 	//LightTable::merge(match_addrs_id, AND, match_addrs_name, matchs);
 
@@ -154,43 +154,61 @@ void test_join_naive()
 	printf("Naive # %d\n", match_addrs_id.size());
 }
 
-void test_join_hash()
+std::vector<AddrPair> match_addrs_id;
+std::vector<AddrPair> match_addrs_name;
+std::vector<AddrPair> matchs;
+std::pair<LightTable *, LightTable *> comb1, comb2;
+
+void test_join_cross1()
 {
-	const char *a_select[] = { "Name" , "Grade"};
-	const char *b_select[] = { "BookID", "BookName", "BookGrade" };
+	//comb1 = LightTable::join_cross(t1, "Grade", LESS, t2, "BookGrade", match_addrs_name);
+	comb1 = LightTable::join_self(t1, "Grade", LESS, attr_t(100), match_addrs_id);
+	printf("Join1: %d\n", match_addrs_id.size());
+}
 
-	std::vector<AddrPair> match_addrs_id;
-	std::vector<AddrPair> match_addrs_name;
-	std::vector<AddrPair> matchs;
+void test_join_cross2()
+{
+	comb2 = LightTable::join_cross(t1, "Grade", EQ, t2, "BookGrade", match_addrs_name);
+	printf("Join2: %d\n", match_addrs_name.size());
+}
 
-	LightTable::join(t1, "Grade", LESS, attr_t(60), t2, match_addrs_id);
-	LightTable::join(t1, "Name", EQ, t2, "BookName", match_addrs_name);
-	LightTable::merge(match_addrs_id, AND, match_addrs_name, matchs);
-
-	LightTable::select(
-		t1, std::vector<std::string>(a_select, a_select + 2),
-		t2, std::vector<std::string>(b_select, b_select + 3),
-		matchs);
-	printf("Merge # %d\n", match_addrs_id.size());
-
-	//LightTable::select(
-	//	t1, std::vector<std::string>(a_select, a_select + 2),
-	//	t2, std::vector<std::string>(b_select, b_select + 2),
-	//	match_addrs_name);
-	//printf("\n");
-
-	//LightTable::select(
-	//	t1, std::vector<std::string>(a_select, a_select + 2),
-	//	t2, std::vector<std::string>(b_select, b_select + 2),
-	//	matchs);
+void test_merge()
+{
+	LightTable::merge(comb1, match_addrs_id, AND, comb2, match_addrs_name, matchs);
+	printf("Merge: %d\n", matchs.size());
 }
 
 static DatabaseLite gDb("LiteDB.dbs");
 
 void test_database_lite_create()
 {
-	gDb.exec(std::string("CREATE TABLE Book (BookId int PRIMARY KEY, BookName varchar(20), BookPrice int);"));
-	gDb.exec(std::string("CREATE TABLE Student (StudentId int PRIMARY KEY, StudentName varchar(20), StudentAddr varchar(40), StudentScore int, StudentDept varchar(40));"));
+	gDb.exec(std::string("CREATE TABLE Book (BookID int PRIMARY KEY, BookName varchar(20), BookPrice int);"));
+	gDb.exec(std::string("CREATE TABLE Student (StudentID int PRIMARY KEY, StudentName varchar(20), StudentAddr varchar(40), StudentScore int, StudentDept varchar(40));"));
+	
+	gDb.exec_create_index("Book", "BookName", HASH);
+	gDb.exec_create_index("Book", "BookPrice", TREE);
+
+	gDb.exec_create_index("Student", "StudentName", HASH);
+	gDb.exec_create_index("Student", "StudentScore", TREE);
+
+	std::stringstream ss;
+	char buff[255];
+	for (int i = 0; i < 10; i++)
+	{
+		sprintf(buff, "INSERT INTO Book VALUES(%d, 'Book%d', %d);", i, i * 10, i);
+		ss << buff << "\n";
+	}
+	gDb.exec(ss.str());
+
+	std::stringstream ss2;
+	char buff2[255];
+	for (int i = 0; i < 10; i++)
+	{
+		sprintf(buff2, "INSERT INTO Student VALUES(%d, 'Student%d', 'Addr%d', %d, 'Dept%d');", i, i * 10, i, i, i);
+		gDb.exec(std::string(buff2));
+		ss << buff2 << "\n";
+	}
+	
 }
 
 void test_database_lite_insert()
@@ -204,11 +222,9 @@ void test_database_lite_insert()
 */
 int main(int argc, char *argv[])
 {
-	profile(test_lite_table_join);
-	profile(test_join_hash);
-	//test_database_lite_create();
-	//test_database_lite_insert();
-	
+	test_database_lite_create();
+	gDb.exec(std::string("SELECT S.StudentScore, Book.BookPrice FROM Book AS B, Student AS S WHERE S.StudentScore > 5 OR S.StudentScore < 8;"));
+
 	system("pause");
 	return 0;
 

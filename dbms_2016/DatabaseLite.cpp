@@ -2,6 +2,7 @@
 
 #define UNKOWN_STMT_TYPE 0x1
 #define UNEXPECTED_ERROR 0x2
+#define AMBIGUOUS_ERROR 0x3
 
 DatabaseLite::DatabaseLite(const char *dbs_filepath)
 {
@@ -57,6 +58,12 @@ void DatabaseLite::exec(std::string & command)
 			break;
 		}
 	}
+}
+
+void DatabaseLite::exec_create_index(std::string tablename, std::string attrname, IndexType type)
+{
+	LightTable & table = mDbf.get_table(tablename);
+	table.create_index(attrname.c_str(), type);
 }
 
 void DatabaseLite::load(std::string dbs_filepath)
@@ -146,12 +153,379 @@ void DatabaseLite::exec_select(sql::SQLStatement * stmt)
 
 	sql::SelectStatement & select_stmt = static_cast<sql::SelectStatement&>(*stmt);
 
+	std::vector<std::pair<sql::TableRef *, LightTable*>> from_tables; // At most two table, use linear search faster
+	std::vector<std::vector<AddrPair>> where_addr_pairs;
+	std::pair<LightTable *, LightTable *> table_comb;
+	std::vector<std::tuple<LightTable *, int, int>> select_cols;
+
+	std::vector<sql::Expr*> * select_clause = select_stmt.selectList;
+	select_cols.resize(select_clause->size());
+
+	parse_from_clause(select_stmt.fromTable, from_tables);
+
 	if (select_stmt.hasWhere())
 	{
-
+		parse_where_clause(select_stmt.whereClause, from_tables, where_addr_pairs, table_comb);
 	}
 	else
 	{
-
+		if (from_tables.size() == 1)
+			table_comb.first = table_comb.second = 0;
+		else if (from_tables.size() == 2)
+			table_comb = { from_tables[0].second, from_tables[1].second};
+		else
+			throw exception_t(UNEXPECTED_ERROR, "No table selected");
 	}
+
+	for (int i = 0; i < select_clause->size(); i++)
+	{
+		sql::Expr * col_ref = select_clause->at(i);
+
+		// First, second
+		LightTable * bind_table = match_table(col_ref, from_tables);
+		if (bind_table == NULL)
+		{
+			throw exception_t(UNEXPECTED_ERROR, "Table not found.");
+		}
+		int comb_id = (bind_table == table_comb.first) ? 0 : 1;
+
+		// Tuple element id
+		int tuple_ele_id = bind_table->get_attr_id(col_ref->name);
+		select_cols[i] = std::make_tuple(bind_table, comb_id, tuple_ele_id);
+	}
+	
+	if (select_stmt.hasWhere())
+	{
+		for (auto pair : where_addr_pairs.back())
+		{
+			for (auto col : select_cols)
+			{
+				int addr = (std::get<1>(col) == 0) ? pair.first : pair.second;
+				int colid = std::get<2>(col);
+				LightTable * bind_table = std::get<0>(col);
+
+				auto & tuple = bind_table->get_tuple(addr);
+				std::cout << tuple.at(colid) << "\t";
+			}
+			std::cout << "\n";
+		}
+	}
+	else
+	{
+		if (from_tables.size() == 2)
+		{
+			LightTable *tables[2] = { from_tables[0].second , from_tables[1].second };
+			for (int ai = 0; ai < tables[0]->size(); ai++)
+			{
+				for (int bi = 0; bi < tables[1]->size(); bi++)
+				{
+					for (auto col : select_cols)
+					{
+						int addr = (std::get<1>(col) == 0) ? ai : bi;
+						int colid = std::get<2>(col);
+						LightTable * bind_table = std::get<0>(col);
+
+						auto & tuple = bind_table->get_tuple(addr);
+						std::cout << tuple.at(colid) << "\t";
+					}
+					std::cout << "\n";
+				}
+			}
+		}
+		else if(from_tables.size() == 1)
+		{
+			LightTable *tables[2] = { from_tables[0].second , from_tables[1].second };
+			for (int ai = 0; ai < tables[0]->size(); ai++)
+			{
+				for (auto col : select_cols)
+				{
+					int addr = ai;
+					int colid = std::get<2>(col);
+					LightTable * bind_table = std::get<0>(col);
+
+					auto & tuple = bind_table->get_tuple(addr);
+					std::cout << tuple.at(colid) << "\t";
+				}
+				std::cout << "\n";
+			}
+		}
+	}
+}
+
+void DatabaseLite::parse_select_clause(
+	std::vector<sql::Expr*> * select_clause, 
+	std::vector<FromEntry> & from_tables,
+	std::vector<SelectEntry> & select_cols)
+{
+
+}
+
+void DatabaseLite::parse_from_clause(
+	std::vector<sql::TableRef*> * from_clause, 
+	std::vector<FromEntry> & from_tables)
+{
+	for (int i = 0; i < from_clause->size(); i++)
+	{
+		sql::TableRef *ref = from_clause->at(i);
+		LightTable & table_ref = mDbf.get_table(ref->name);
+
+		// if duplicated table exist, insertion failed
+		from_tables.push_back({ ref, &table_ref });
+	}
+}
+
+void DatabaseLite::parse_where_clause(
+	sql::Expr * where_clause, 
+	std::vector<std::pair<sql::TableRef*, LightTable*>> & from_tables,
+	std::vector<std::vector<AddrPair>> & where_addr_pairs,
+	std::pair<LightTable *, LightTable *> & table_comb)
+{
+	std::vector<std::pair<LightTable *, LightTable *>> tableCombs; // Used to check orders before merge
+	std::stack<sql::Expr *> tokenStack;
+	std::stack<sql::Expr *> opStack;
+	std::stack<sql::Expr *> inputStack;
+	
+	inputStack.push(where_clause);
+
+	while (!inputStack.empty())
+	{
+		sql::Expr *expr = inputStack.top(); inputStack.pop();
+		sql::Expr * childs[2] = { expr->expr , expr->expr2 };
+		switch (expr->type)
+		{
+		case sql::kExprOperator: // TODO: handle UMINUS
+			opStack.push(expr);
+			break;
+		case sql::kExprColumnRef: case sql::kExprLiteralInt: case sql::kExprLiteralString:
+			tokenStack.push(expr);
+			break;
+		default:
+			throw exception_t(UNEXPECTED_ERROR, "Where statement parsing error: unexpected expr type.");
+		}
+
+		for (int i = 0; i < 2; i++)
+		{
+			if (childs[i] != NULL)
+				inputStack.push(childs[i]);
+		}
+	}
+
+	while (!opStack.empty())
+	{
+		sql::Expr * expr = opStack.top(); opStack.pop();
+		assert(expr != NULL);
+
+		// AND, OR
+		if ((expr->op_type == sql::Expr::AND || expr->op_type == sql::Expr::OR) && where_addr_pairs.size() >= 2)
+		{
+			if(where_addr_pairs.size() != 2)
+				throw exception_t(UNEXPECTED_ERROR, "No correct number of pairs when merge.");
+			/// TODO: Check order
+			// Check order (force them to be in same)
+			auto oit = tableCombs.rbegin();
+			auto & comb1 = *oit;
+			oit++;
+			auto & comb2 = *oit;
+
+			where_addr_pairs.resize(where_addr_pairs.size() + 1);
+			merge_type_t merge_type = (expr->op_type == sql::Expr::AND) ? AND : OR;
+			table_comb = LightTable::merge(
+				comb2,
+				where_addr_pairs.at(0),
+				merge_type, 
+				comb1,
+				where_addr_pairs.at(1),
+				where_addr_pairs.back());
+		}
+		// =, <>, <, >
+		else if (tokenStack.size() >= 2)
+		{
+			sql::Expr *operands[2] = { 0 };
+			operands[0] = tokenStack.top(); tokenStack.pop();
+			operands[1] = tokenStack.top(); tokenStack.pop();
+
+			// Two-way join
+			if (operands[0]->type == sql::kExprColumnRef && operands[1]->type == sql::kExprColumnRef)
+			{
+				LightTable *tables[2] = { 0 };
+				for (int i = 0; i < from_tables.size(); i++)
+					tables[i] = match_table(operands[i], from_tables);
+
+				if (tables[0] == tables[1])
+				{
+					where_addr_pairs.resize(where_addr_pairs.size() + 1);
+					tableCombs.emplace_back(
+						LightTable::join_self(
+							*tables[0],
+							operands[0]->name,
+							expr_op_to_rel(expr),
+							operands[1]->name,
+							where_addr_pairs.back())
+					);
+					table_comb.first = table_comb.second = tables[0];
+				}
+				else
+				{
+					where_addr_pairs.resize(where_addr_pairs.size() + 1);
+					tableCombs.emplace_back(LightTable::join_cross(
+						*tables[0],
+						operands[0]->name,
+						expr_op_to_rel(expr),
+						*tables[1],
+						operands[1]->name,
+						where_addr_pairs.back()));
+					table_comb.first = tables[0];
+					table_comb.second = tables[1];
+				}
+			}
+			// Constant expression
+			else if (operands[0]->type != sql::kExprColumnRef && operands[1]->type != sql::kExprColumnRef)
+			{
+				throw exception_t(UNEXPECTED_ERROR, "Constant expression is forbidden.");
+			}
+			// Constant join Colref
+			else if (operands[1]->type == sql::kExprLiteralInt || operands[1]->type == sql::kExprLiteralString)
+			{
+				// Join(colref, k)
+				LightTable *table = match_table(operands[0], from_tables);
+				LightTable *onto_table;
+				for (auto pair : from_tables)
+					if (pair.second != table)
+						onto_table = pair.second;
+	
+				where_addr_pairs.resize(where_addr_pairs.size() + 1);
+				tableCombs.emplace_back(LightTable::join_self(
+					*table,
+					operands[0]->name,
+					expr_op_to_rel(expr),
+					expr_to_attr(operands[1]),
+					where_addr_pairs.back()));
+				table_comb.first = table_comb.second = table;
+			}
+			else
+			{
+				throw exception_t(UNEXPECTED_ERROR, "Left hand side cannot be a constant.");
+			}
+		}
+	}
+}
+
+LightTable * DatabaseLite::match_table(sql::Expr * colref, std::vector<std::pair<sql::TableRef*, LightTable*>> & from_tables)
+{
+	// Named colref 
+	if (colref->hasTable())
+	{
+		for (auto & pair : from_tables)
+		{
+			// Match with real-name
+			if (strcmp(colref->table, pair.first->name) == 0)
+			{
+				if (pair.second->has_attr(colref->name))
+					return pair.second;
+				else
+					throw exception_t(UNEXPECTED_ERROR, "Attribute not found in table.");
+			}
+
+			// Match with alias
+			if (pair.first->alias != NULL && strcmp(colref->table, pair.first->alias) == 0)
+			{
+				if (pair.second->has_attr(colref->name))
+					return pair.second;
+				else
+					throw exception_t(UNEXPECTED_ERROR, "Attribute not found in table.");
+			}
+		}
+	}
+	// Unnamed colref
+	else
+	{
+		LightTable *match_table = NULL;
+		int cnt = 0;
+		for (auto & pair : from_tables)
+		{
+			if (pair.second->has_attr(colref->name))
+			{
+				if (cnt > 0)
+					throw exception_t(AMBIGUOUS_ERROR, "Ambiguous attribute name");
+				match_table = pair.second;
+				cnt++;
+			}
+		}
+
+		if (match_table != NULL)
+			return match_table;
+	}
+
+	throw exception_t(UNEXPECTED_ERROR, "Attribute name cannot match.");
+}
+
+relation_type_t DatabaseLite::expr_op_to_rel(sql::Expr * expr_op)
+{
+	assert(expr_op->type == sql::kExprOperator);
+	switch (expr_op->op_type)
+	{
+	case sql::Expr::SIMPLE_OP:
+	{
+		switch (expr_op->op_char)
+		{
+		case '=': return EQ;
+		case '<': return LESS;
+		case '>': return LARGE;
+		default:
+			throw exception_t(UNEXPECTED_ERROR, "Operator type conversion error.");
+		}
+	}
+	break;
+	case sql::Expr::NOT_EQUALS: return NEQ;
+	default:
+		throw exception_t(UNEXPECTED_ERROR, "Operator type conversion error.");
+	}
+}
+
+attr_t DatabaseLite::expr_to_attr(sql::Expr * expr)
+{
+	switch (expr->type)
+	{
+	case sql::kExprLiteralInt: return expr->ival;
+	case sql::kExprLiteralString: return expr->name;
+	default: throw exception_t(UNEXPECTED_ERROR, "Expression convert to attr error, unknown expr type.");
+	}
+}
+
+bool DatabaseLite::eval_constant_op(sql::Expr * a, sql::Expr * b, sql::Expr *op)
+{
+	if (a->type != b->type)
+		throw exception_t(UNEXPECTED_ERROR, "Integer cannot compare to String");
+	assert(op != NULL && op->type == sql::kExprOperator);
+	
+	if (a->type == sql::kExprLiteralInt)
+	{
+		switch (op->op_type)
+		{
+		case sql::Expr::SIMPLE_OP:
+		{
+			switch (op->op_char)
+			{
+			case '=': return a->ival == b->ival;
+			case '<': return a->ival < b->ival;
+			case '>': return a->ival > b->ival;
+			default:
+				throw exception_t(UNEXPECTED_ERROR, "Operator type conversion error.");
+			}
+		}
+		break;
+		case sql::Expr::NOT_EQUALS: return a->ival != b->ival;
+		default:
+			throw exception_t(UNEXPECTED_ERROR, "Operator type conversion error.");
+		}
+	}
+	else
+	{
+		if (op->op_type == sql::Expr::SIMPLE_OP && op->op_char == '=')
+			return strcmp(a->name, b->name);
+		else
+			throw exception_t(UNEXPECTED_ERROR, "String only support equal");
+	}
+
+	return false;
 }
