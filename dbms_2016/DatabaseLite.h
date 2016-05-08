@@ -26,6 +26,7 @@ public:
 	DatabaseLite(const char *dbs_filepath);
 	~DatabaseLite();
 
+	void exec(std::string & command, bool profile);
 	void exec(std::string & command);
 	void exec_create_index(std::string tablename, std::string attrname, IndexType type);
 	void load(std::string dbs_filepath);

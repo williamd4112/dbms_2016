@@ -19,13 +19,18 @@ DatabaseLite::~DatabaseLite()
 
 }
 
-void DatabaseLite::exec(std::string & command)
+void DatabaseLite::exec(std::string & command, bool profile)
 {
 	sql::SQLParserResult *parser = sql::SQLParser::parseSQLString(command);
 	try
 	{
 		if (parser->isValid)
 		{
+			clock_t begin, end;
+			double time_spent;
+
+			begin = clock();
+
 			for (sql::SQLStatement *stmt : parser->statements)
 			{
 				switch (stmt->type())
@@ -43,6 +48,13 @@ void DatabaseLite::exec(std::string & command)
 					throw exception_t(UNKOWN_STMT_TYPE, "Unknown stmt type");
 				}
 			}
+
+			if (profile)
+			{
+				end = clock();
+				time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
+				printf("Time elapsed: %lf\n", time_spent);
+			}
 		}
 		else
 		{
@@ -58,6 +70,11 @@ void DatabaseLite::exec(std::string & command)
 			break;
 		}
 	}
+}
+
+void DatabaseLite::exec(std::string & command)
+{
+	exec(command, false);
 }
 
 void DatabaseLite::exec_create_index(std::string tablename, std::string attrname, IndexType type)

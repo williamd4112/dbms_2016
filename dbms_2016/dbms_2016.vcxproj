@@ -210,6 +210,10 @@
     <ClInclude Include="test.h" />
     <ClInclude Include="View.h" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="trans.sql" />
+    <None Include="user.sql" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
