@@ -19,18 +19,25 @@ trans.attr2: no
 user1.attr5: no
 time: 0.529s
 
+case 2:
+user1.attr1: tree
+trans.attr2: tree
+user1.attr5: tree
+time: 0.001s
+
 3.
 SELECT COUNT(*)
 FROM user1
 WHERE attr3 > 100000 AND attr3 < 200000;
 
-case 1:
+case 1: case 2:
 user1.attr3: no
 
 4. 
 SELECT COUNT(*)
 FROM trans;
 
+case 1: case 2:
 time: 0.0000
 
 5.
@@ -38,4 +45,5 @@ SELECT SUM(attr4)
 FROM user1
 WHERE attr3 = 1510503 OR attr5 > 500000;
 
+case 1: case 2:
 time: 0.0000

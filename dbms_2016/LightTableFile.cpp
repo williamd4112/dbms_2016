@@ -145,6 +145,7 @@ inline void LightTableFile::read_from()
 		}
 		
 		idx_file->open(index_record.index_name, "r+");
+		idx_file->read_from();
 	}
 }
 
