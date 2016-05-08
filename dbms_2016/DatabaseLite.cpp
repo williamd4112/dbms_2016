@@ -156,7 +156,8 @@ void DatabaseLite::exec_select(sql::SQLStatement * stmt)
 	std::vector<std::pair<sql::TableRef *, LightTable*>> from_tables; // At most two table, use linear search faster
 	std::vector<std::vector<AddrPair>> where_addr_pairs;
 	std::pair<LightTable *, LightTable *> table_comb;
-	std::vector<std::tuple<LightTable *, int, int>> select_cols;
+	std::vector<std::tuple<LightTable *, int, int, DatabaseAggregateType, bool>> select_cols;
+	std::vector<std::tuple<LightTable *, int, int, DatabaseAggregateType, bool>> aggre_list; //table, tuple id, col id, type
 
 	std::vector<sql::Expr*> * select_clause = select_stmt.selectList;
 
@@ -175,12 +176,219 @@ void DatabaseLite::exec_select(sql::SQLStatement * stmt)
 		else
 			throw exception_t(UNEXPECTED_ERROR, "No table selected");
 	}
-
-	for (int i = 0; i < select_clause->size(); i++)
+	
+	// Select stage
+	if (select_stmt.hasAggregation())
 	{
-		sql::Expr * col_ref = select_clause->at(i);
+		std::vector<sql::AggregationFunction*> *func_list = select_stmt.aggregation_list;
+		for (int i = 0; i < func_list->size(); i++)
+		{
+			sql::Expr *col_ref = select_stmt.aggregation_list->at(i)->attribute;
+			DatabaseAggregateType aggre_type = func_list->at(i)->type == sql::AggregationFunction::kCount ? COUNT : SUM;
+			parse_select_entry(col_ref, from_tables, table_comb, aggre_type, aggre_list);
+		}
 
-		if (col_ref->type == sql::kExprStar)
+		std::vector<int> aggre_counters(aggre_list.size(), 0);
+
+		if (select_stmt.hasWhere())
+		{
+			for (auto pair : where_addr_pairs.back())
+			{
+				for (int i = 0; i < aggre_counters.size(); i++)
+				{
+					exec_select_aggre(pair, aggre_list[i], aggre_counters[i]);
+				}
+			}
+
+			for (int i = 0; i < aggre_counters.size(); i++)
+				std::cout << aggre_counters[i] << "\t";
+			std::cout << "\n";
+		}
+		else
+		{
+			if (from_tables.size() == 2)
+			{
+				LightTable *tables[2] = { from_tables[0].second , from_tables[1].second };
+				for (int ai = 0; ai < tables[0]->size(); ai++)
+				{
+					for (int bi = 0; bi < tables[1]->size(); bi++)
+					{
+						for (int i = 0; i < aggre_list.size(); i++)
+						{
+							exec_select_aggre({ ai, bi }, aggre_list[i], aggre_counters[i]);
+						}
+					}
+				}
+				for (int i = 0; i < aggre_counters.size(); i++)
+					std::cout << aggre_counters[i] << "\t";
+				std::cout << "\n";
+			}
+			else if(from_tables.size() == 1)
+			{
+				LightTable *tables[1] = { from_tables[0].second };
+				for (int ai = 0; ai < tables[0]->size(); ai++)
+				{
+					for (int i = 0; i < aggre_list.size(); i++)
+					{
+						exec_select_aggre({ ai, ai }, aggre_list[i], aggre_counters[i]);
+					}
+				}
+
+				for (int i = 0; i < aggre_counters.size(); i++)
+					std::cout << aggre_counters[i] << "\t";
+				std::cout << "\n";
+			}
+			else
+			{
+				throw exception_t(UNEXPECTED_ERROR, "No table selected");
+			}
+		}
+	}
+	else
+	{
+		for (int i = 0; i < select_clause->size(); i++)
+		{
+			sql::Expr * col_ref = select_clause->at(i);
+			parse_select_entry(col_ref, from_tables, table_comb, NO_AGGRE, select_cols);
+		}
+
+		if (select_stmt.hasWhere())
+		{
+			for (auto pair : where_addr_pairs.back())
+			{
+				for (auto col : select_cols)
+				{
+					int addr = (std::get<1>(col) == 0) ? pair.first : pair.second;
+					int colid = std::get<2>(col);
+					LightTable * bind_table = std::get<0>(col);
+
+					auto & tuple = bind_table->get_tuple(addr);
+					std::cout << tuple.at(colid) << "\t";
+				}
+				std::cout << "\n";
+			}
+		}
+		else
+		{
+			if (from_tables.size() == 2)
+			{
+				LightTable *tables[2] = { from_tables[0].second , from_tables[1].second };
+				for (int ai = 0; ai < tables[0]->size(); ai++)
+				{
+					for (int bi = 0; bi < tables[1]->size(); bi++)
+					{
+						for (auto col : select_cols)
+						{
+							int addr = (std::get<1>(col) == 0) ? ai : bi;
+							int colid = std::get<2>(col);
+							LightTable * bind_table = std::get<0>(col);
+
+							auto & tuple = bind_table->get_tuple(addr);
+							std::cout << tuple.at(colid) << "\t";
+						}
+						std::cout << "\n";
+					}
+				}
+			}
+			else if (from_tables.size() == 1)
+			{
+				LightTable *tables[1] = { from_tables[0].second };
+				for (int ai = 0; ai < tables[0]->size(); ai++)
+				{
+					for (auto col : select_cols)
+					{
+						int addr = ai;
+						int colid = std::get<2>(col);
+						LightTable * bind_table = std::get<0>(col);
+
+						auto & tuple = bind_table->get_tuple(addr);
+						std::cout << tuple.at(colid) << "\t";
+					}
+					std::cout << "\n";
+				}
+			}
+		}
+	}
+}
+
+void DatabaseLite::exec_select_aggre(std::pair<int, int> pair, SelectEntry aggre_ent, int & aggre_counter)
+{
+	bool isStar = std::get<4>(aggre_ent);
+	DatabaseAggregateType aggre_type = std::get<3>(aggre_ent);
+
+	if (isStar && aggre_type == SUM)
+		throw exception_t(UNEXPECTED_ERROR, "Sum(*) illegal");
+	if (isStar)
+	{
+		switch (aggre_type)
+		{
+		case COUNT:
+			aggre_counter++;
+			break;
+		default:
+			throw exception_t(UNEXPECTED_ERROR, "Sum(*) illegal");
+		}
+	}
+	else
+	{
+		int addr = (std::get<1>(aggre_ent) == 0) ? pair.first : pair.second;
+		int colid = std::get<2>(aggre_ent);
+		LightTable * bind_table = std::get<0>(aggre_ent);
+		auto & tuple = bind_table->get_tuple(addr);
+		uint8_t attr_type = bind_table->get_attr_type(colid);
+
+		switch (aggre_type)
+		{
+		case COUNT:
+			if (attr_type == ATTR_TYPE_INTEGER ||
+				(attr_type == ATTR_TYPE_VARCHAR
+					&& tuple.at(colid).size() > 0))
+				aggre_counter++;
+			break;
+		case SUM:
+			if (attr_type == ATTR_TYPE_VARCHAR)
+				throw exception_t(UNEXPECTED_ERROR, "Varchar cannot sum.");
+			aggre_counter += tuple.at(colid).Int();
+			break;
+		default:
+			break;
+		}
+	}
+}
+
+void DatabaseLite::parse_select_entry(
+	sql::Expr *col_ref, 
+	std::vector<FromEntry> & from_tables,
+	std::pair<LightTable *, LightTable *> & table_comb,
+	DatabaseAggregateType aggre_type,
+	std::vector<std::tuple<LightTable *, int, int, DatabaseAggregateType, bool>> & select_cols
+	)
+{
+	if (col_ref->type == sql::kExprStar)
+	{
+		if (aggre_type == COUNT || aggre_type == SUM)
+		{
+			if (col_ref->hasTable())
+			{
+				for (int i = 0; i < 2 && i < from_tables.size(); i++)
+				{
+					if (strcmp(col_ref->table, from_tables[i].first->name) != 0)
+						continue;
+					if (col_ref->hasAlias() && from_tables[i].first->alias != NULL
+						&& strcmp(col_ref->alias, from_tables[i].first->alias) != 0)
+						continue;
+
+					int comb_id = i;
+					select_cols.emplace_back(std::make_tuple(from_tables[i].second, comb_id, -1, aggre_type, true));
+					break;
+				}
+			}
+			else
+			{
+				select_cols.emplace_back(std::make_tuple(nullptr, -1, -1, aggre_type, true));
+			}
+		}
+		else
 		{
 			for (int i = 0; i < 2 && i < from_tables.size(); i++)
 			{
@@ -193,91 +401,25 @@ void DatabaseLite::exec_select(sql::SQLStatement * stmt)
 						continue;
 				}
 				int comb_id = i;
-				for(int j = 0; j < from_tables[i].second->tuple_size(); j++)
-					select_cols.emplace_back(std::make_tuple(from_tables[i].second, comb_id, j));
+				for (int j = 0; j < from_tables[i].second->tuple_size(); j++)
+					select_cols.emplace_back(std::make_tuple(from_tables[i].second, comb_id, j, aggre_type, false));
 			}
-		}
-		else
-		{
-			// First, second
-			LightTable * bind_table = match_table(col_ref, from_tables);
-			if (bind_table == NULL)
-			{
-				throw exception_t(UNEXPECTED_ERROR, "Table not found.");
-			}
-			int comb_id = (bind_table == table_comb.first) ? 0 : 1;
-
-			// Tuple element id
-			int tuple_ele_id = bind_table->get_attr_id(col_ref->name);
-			select_cols.emplace_back(std::make_tuple(bind_table, comb_id, tuple_ele_id));
-		}
-	}
-	
-	// Select stage
-	if (select_stmt.hasWhere())
-	{
-		for (auto pair : where_addr_pairs.back())
-		{
-			for (auto col : select_cols)
-			{
-				int addr = (std::get<1>(col) == 0) ? pair.first : pair.second;
-				int colid = std::get<2>(col);
-				LightTable * bind_table = std::get<0>(col);
-
-				auto & tuple = bind_table->get_tuple(addr);
-				std::cout << tuple.at(colid) << "\t";
-			}
-			std::cout << "\n";
 		}
 	}
 	else
 	{
-		if (from_tables.size() == 2)
+		// First, second
+		LightTable * bind_table = match_table(col_ref, from_tables);
+		if (bind_table == NULL)
 		{
-			LightTable *tables[2] = { from_tables[0].second , from_tables[1].second };
-			for (int ai = 0; ai < tables[0]->size(); ai++)
-			{
-				for (int bi = 0; bi < tables[1]->size(); bi++)
-				{
-					for (auto col : select_cols)
-					{
-						int addr = (std::get<1>(col) == 0) ? ai : bi;
-						int colid = std::get<2>(col);
-						LightTable * bind_table = std::get<0>(col);
-
-						auto & tuple = bind_table->get_tuple(addr);
-						std::cout << tuple.at(colid) << "\t";
-					}
-					std::cout << "\n";
-				}
-			}
+			throw exception_t(UNEXPECTED_ERROR, "Table not found.");
 		}
-		else if(from_tables.size() == 1)
-		{
-			LightTable *tables[1] = { from_tables[0].second};
-			for (int ai = 0; ai < tables[0]->size(); ai++)
-			{
-				for (auto col : select_cols)
-				{
-					int addr = ai;
-					int colid = std::get<2>(col);
-					LightTable * bind_table = std::get<0>(col);
+		int comb_id = (bind_table == table_comb.first) ? 0 : 1;
 
-					auto & tuple = bind_table->get_tuple(addr);
-					std::cout << tuple.at(colid) << "\t";
-				}
-				std::cout << "\n";
-			}
-		}
+		// Tuple element id
+		int tuple_ele_id = bind_table->get_attr_id(col_ref->name);
+		select_cols.emplace_back(std::make_tuple(bind_table, comb_id, tuple_ele_id, aggre_type, false));
 	}
-}
-
-void DatabaseLite::parse_select_clause(
-	std::vector<sql::Expr*> * select_clause, 
-	std::vector<FromEntry> & from_tables,
-	std::vector<SelectEntry> & select_cols)
-{
-
 }
 
 void DatabaseLite::parse_from_clause(
@@ -358,6 +500,9 @@ void DatabaseLite::parse_where_clause(
 			auto & comb2 = *oit;
 
 			where_addr_pairs.resize(where_addr_pairs.size() + 1);
+			std::vector<LightTable *> candidate_tables;
+			for (auto from_table : from_tables)
+				candidate_tables.emplace_back(from_table.second);
 			merge_type_t merge_type = (expr->op_type == sql::Expr::AND) ? AND : OR;
 			table_comb = LightTable::merge(
 				comb2,
@@ -365,7 +510,8 @@ void DatabaseLite::parse_where_clause(
 				merge_type, 
 				comb1,
 				where_addr_pairs.at(1),
-				where_addr_pairs.back());
+				where_addr_pairs.back(),
+				candidate_tables);
 		}
 		// =, <>, <, >
 		else if (tokenStack.size() >= 2)
@@ -439,6 +585,28 @@ void DatabaseLite::parse_where_clause(
 			else
 			{
 				throw exception_t(UNEXPECTED_ERROR, "Left hand side cannot be a constant.");
+			}
+		}
+	}
+
+	if (from_tables.size() == 2)
+	{
+		// Two table from, but where one, product it
+		if (table_comb.first == table_comb.second)
+		{
+			where_addr_pairs.resize(where_addr_pairs.size() + 1);
+			std::vector<AddrPair> & pairs = where_addr_pairs.at(where_addr_pairs.size() - 2);
+
+			LightTable *other = (from_tables[0].second == table_comb.first) ? from_tables[1].second : from_tables[0].second;
+			
+			table_comb.second = other;
+			
+			for (int i = 0; i < pairs.size(); i++)
+			{
+				for (int j = 0; j < other->size(); j++)
+				{
+					where_addr_pairs.back().emplace_back(i, j);
+				}
 			}
 		}
 	}

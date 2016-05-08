@@ -159,24 +159,24 @@ std::vector<AddrPair> match_addrs_name;
 std::vector<AddrPair> matchs;
 std::pair<LightTable *, LightTable *> comb1, comb2;
 
-void test_join_cross1()
-{
-	//comb1 = LightTable::join_cross(t1, "Grade", LESS, t2, "BookGrade", match_addrs_name);
-	comb1 = LightTable::join_self(t1, "Grade", LESS, attr_t(100), match_addrs_id);
-	printf("Join1: %d\n", match_addrs_id.size());
-}
-
-void test_join_cross2()
-{
-	comb2 = LightTable::join_cross(t1, "Grade", EQ, t2, "BookGrade", match_addrs_name);
-	printf("Join2: %d\n", match_addrs_name.size());
-}
-
-void test_merge()
-{
-	LightTable::merge(comb1, match_addrs_id, AND, comb2, match_addrs_name, matchs);
-	printf("Merge: %d\n", matchs.size());
-}
+//void test_join_cross1()
+//{
+//	//comb1 = LightTable::join_cross(t1, "Grade", LESS, t2, "BookGrade", match_addrs_name);
+//	comb1 = LightTable::join_self(t1, "Grade", LESS, attr_t(100), match_addrs_id);
+//	printf("Join1: %d\n", match_addrs_id.size());
+//}
+//
+//void test_join_cross2()
+//{
+//	comb2 = LightTable::join_cross(t1, "Grade", EQ, t2, "BookGrade", match_addrs_name);
+//	printf("Join2: %d\n", match_addrs_name.size());
+//}
+//
+//void test_merge()
+//{
+//	LightTable::merge(comb1, match_addrs_id, AND, comb2, match_addrs_name, matchs,);
+//	printf("Merge: %d\n", matchs.size());
+//}
 
 static DatabaseLite gDb("LiteDB.dbs");
 
@@ -193,7 +193,7 @@ void test_database_lite_create()
 
 	std::stringstream ss;
 	char buff[255];
-	for (int i = 0; i < 100000; i++)
+	for (int i = 0; i < 10; i++)
 	{
 		sprintf(buff, "INSERT INTO Book VALUES(%d, 'Book%d', %d);", i, i * 10, i);
 		ss << buff << "\n";
@@ -202,7 +202,7 @@ void test_database_lite_create()
 
 	std::stringstream ss2;
 	char buff2[255];
-		for (int i = 0; i < 10000; i++)
+		for (int i = 0; i < 10; i++)
 	{
 		sprintf(buff2, "INSERT INTO Student VALUES(%d, 'Student%d', 'Addr%d', %d, 'Dept%d');", i, i * 10, i, i, i);
 		gDb.exec(std::string(buff2));
@@ -218,7 +218,22 @@ void test_database_lite_insert()
 
 void test_database_select()
 {
-	gDb.exec(std::string("SELECT Book.*, StudentID FROM Book AS B, Student AS S WHERE BookID < 5 AND BookID = StudentID;"));
+	//// S 1 Join
+	//gDb.exec(std::string("SELECT Book.* FROM Book AS B WHERE BookID < 5;"));
+	//std::cout << "\n";
+	//// S S 1 Join
+	//gDb.exec(std::string("SELECT Book.* FROM Book AS B WHERE BookID > 5 AND BookID < 8;"));
+	//std::cout << "\n";
+	// S C 2 Join AND
+	gDb.exec(std::string("SELECT COUNT(Book.*) FROM Book AS B, Student AS S WHERE B.BookID = S.StudentID;"));
+	//std::cout << "\n";
+	// C S 2 Join AND
+	//gDb.exec(std::string("SELECT Book.*, StudentID FROM Book AS B, Student AS S WHERE BookID = StudentID OR BookID < 5;"));
+	//std::cout << "\n";
+	//// S C 2 Join OR
+	//gDb.exec(std::string("SELECT Book.*, StudentID FROM Book AS B, Student AS S WHERE BookID < 5 OR BookID = StudentID;"));
+	//std::cout << "\n";
+
 }
 
 /*

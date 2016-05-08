@@ -392,6 +392,13 @@ uint32_t LightTable::tuple_size()
 	return mTablefile.get_header().attrNum;
 }
 
+uint8_t LightTable::get_attr_type(int i)
+{
+	if (i < 0 || i >= mTablefile.mTableHeader.attrNum)
+		throw exception_t(0, "Array out of bound.");
+	return mTablefile.mAttrDescPool[i].type;
+}
+
 void LightTable::dump()
 {
 	mTablefile.dump_info();
@@ -855,81 +862,101 @@ void LightTable::merge(
 }
 
 std::pair<LightTable *, LightTable *> LightTable::merge(
-	std::pair<LightTable *, LightTable *> a_comb,
-	std::vector<AddrPair>& a, 
+	std::pair<LightTable *, LightTable *> left_comb,
+	std::vector<AddrPair>& left, 
 	merge_type_t merge_type, 
-	std::pair<LightTable *, LightTable *> b_comb,
-	std::vector<AddrPair>& b, 
-	std::vector<AddrPair>& c)
+	std::pair<LightTable *, LightTable *> right_comb,
+	std::vector<AddrPair>& right, 
+	std::vector<AddrPair>& c,
+	std::vector<LightTable*>  & from_tables)
 {
-	assert(a_comb.first != NULL && a_comb.second != NULL);
-	assert(b_comb.first != NULL && b_comb.second != NULL);
+	assert(left_comb.first != NULL && left_comb.second != NULL);
+	assert(right_comb.first != NULL && right_comb.second != NULL);
 
 	// AB AB (no AB, BA for now) => AB
-	bool a_reflex = a_comb.first == a_comb.second;
-	bool b_reflex = b_comb.first == b_comb.second;
+	bool a_reflex = left_comb.first == left_comb.second;
+	bool b_reflex = right_comb.first == right_comb.second;
 
 	if (!a_reflex && !b_reflex)
 	{
-		if (a_comb.first != b_comb.first)
+		if (left_comb.first != right_comb.first)
 			throw exception_t(TABLE_COMB_ERROR, "Table combination error, no AB, BA");
-		merge(a, merge_type, b, c);
-		return std::pair<LightTable *, LightTable *>(a_comb.first, a_comb.second);
+		merge(left, merge_type, right, c);
+		return std::pair<LightTable *, LightTable *>(left_comb.first, left_comb.second);
 	}
 	else if(a_reflex && b_reflex)
 	{
 		// AA, AA => AA
-		if (a_comb.first == b_comb.first)
+		if (left_comb.first == right_comb.first)
 		{
-			merge(a, merge_type, b, c);
-			return std::pair<LightTable *, LightTable *>( a_comb.first , a_comb.first );
+			if (from_tables.size() == 1)
+			{
+				merge(left, merge_type, right, c);
+				return std::pair<LightTable *, LightTable *>(left_comb.first, left_comb.first);
+			}
+			else if(from_tables.size() == 2)
+			{
+				std::vector<AddrPair> tmp(left.size());
+				if (left.begin() != left.end())
+					std::sort(left.begin(), left.end());
+				if (right.begin() != right.end())
+					std::sort(right.begin(), right.end());
+
+				std::vector<AddrPair>::iterator it;
+
+				tmp.resize(left.size() + right.size());
+
+				switch (merge_type)
+				{
+				case AND:
+					it = std::set_intersection(left.begin(), left.end(), right.begin(), right.end(), tmp.begin());
+					break;
+				case OR:
+					it = std::set_union(left.begin(), left.end(), right.begin(), right.end(), tmp.begin());
+					break;
+				default:
+					break;
+				}
+				c.resize(it - c.begin());
+
+				LightTable *other = (from_tables[0] == left_comb.first) ? from_tables[1] : from_tables[0];
+				for (auto ait = left.begin(); ait != left.end(); ait++)
+					for (int i = 0; i < other->size(); i++)
+						c.emplace_back(ait->first, i);
+				return std::pair<LightTable *, LightTable *>(left_comb.first, other);
+			}
 		}
 		else
 		{
 			// AA BB => AB
-			std::vector<AddrPair> exp_a, exp_b;
-			exp_a.reserve(a.size());
-			exp_b.reserve(b.size());
-
-			auto a_begin = a_comb.first->begin();
-			auto b_begin = b_comb.first->begin();
-			auto a_end = a_comb.second->end();
-			auto b_end = b_comb.second->end();
-
-			for (auto ait = a.begin(); ait != a.end(); ait++)
-				for (auto bit = b_begin; bit != b_end; bit++)
-					exp_a.emplace_back(ait->first, bit - b_begin);
-
-			for (auto bit = b.begin(); bit != b.end(); bit++)
-				for (auto ait = a_begin; ait != a_end; ait++)
-					exp_b.emplace_back(bit->first, ait - a_begin);
-
-			merge(exp_a, merge_type, exp_b, c);
-			return std::pair<LightTable *, LightTable *>( a_comb.first , b_comb.second );
+			for (int ai = 0; ai < left.size(); ai++)
+				for (int bi = 0; bi < right.size(); bi++)
+					c.emplace_back(left[ai].first, right[bi].second);
+			return std::pair<LightTable *, LightTable *>( left_comb.first , right_comb.second );
 		}
 	}
 	else if (a_reflex)
 	{
 		// AA AB => AB
-		if(b_comb.second == a_comb.first)
+		if(right_comb.second == left_comb.first)
 			throw exception_t(TABLE_COMB_ERROR, "Table combination error, no AA, BA");
-		if (a.begin() != a.end())
-			std::sort(a.begin(), a.end());
-		if (b.begin() != b.end())
-			std::sort(b.begin(), b.end());
+		if (left.begin() != left.end())
+			std::sort(left.begin(), left.end());
+		if (right.begin() != right.end())
+			std::sort(right.begin(), right.end());
 		switch (merge_type)
 		{
 			case AND:
 			{
 				int ai = 0, bi = 0;
-				while (ai < a.size() && bi < b.size())
+				while (ai < left.size() && bi < right.size())
 				{
-					if (a[ai].first == b[bi].first)
+					if (left[ai].first == right[bi].first)
 					{
-						c.emplace_back(a[ai].first, b[bi].second);
+						c.emplace_back(left[ai].first, right[bi].second);
 						bi++;
 					}
-					else if(a[ai].first < b[bi].first)
+					else if(left[ai].first < right[bi].first)
 					{
 						ai++;
 					}
@@ -943,39 +970,37 @@ std::pair<LightTable *, LightTable *> LightTable::merge(
 			case OR:
 			{
 				// A is unique
-				int ai = 0, bi = 0;
-				while (ai < a.size() && bi < b.size())
+				int li = 0, ri = 0;
+				while (li < left.size() && ri < right.size())
 				{
-					if (a[ai].first == b[bi].first)
+					if (left[li].first == right[ri].first)
 					{
-						bi++;
+						ri++;
 					}
-					else if (a[ai].first < b[bi].first)
+					else if (left[li].first < right[ri].first)
 					{
-						while (ai < a.size() && bi < b.size() && a[ai].first == b[bi].first)
-							bi++;
-						for (int i = 0; i < b_comb.second->size(); i++)
-							c.emplace_back(a[ai].first, i);
-						ai++;
+						for (int i = 0; i < right_comb.second->size(); i++)
+							c.emplace_back(left[li].first, i);
+						li++;
 					}
 					else
 					{
-						c.emplace_back(b[bi].first, b[bi].first);
-						bi++;
+						c.emplace_back(right[ri].first, right[ri].second);
+						ri++;
 					}
 				}
 
-				while (ai < a.size())
+				while (li < left.size())
 				{
-					for (int i = 0; i < b_comb.second->size(); i++)
-						c.emplace_back(a[ai].first, i);
-					ai++;
+					for (int i = 0; i < right_comb.second->size(); i++)
+						c.emplace_back(left[li].first, i);
+					li++;
 				}
 
-				while (bi < b.size())
+				while (ri < right.size())
 				{
-					c.emplace_back(b[bi].first, b[bi].first);
-					bi++;
+					c.emplace_back(right[ri].first, right[ri].second);
+					ri++;
 				}
 			}
 			break;
@@ -984,25 +1009,78 @@ std::pair<LightTable *, LightTable *> LightTable::merge(
 		}
 		
 
-		return std::pair<LightTable *, LightTable *>( a_comb.first , b_comb.second );
+		return std::pair<LightTable *, LightTable *>( left_comb.first , right_comb.second );
 	}
 	else
 	{
-		// AB BB
-		if (b_comb.second == a_comb.first)
-			throw exception_t(TABLE_COMB_ERROR, "Table combination error, no BA, BB");
+		// AB AA => AB
+		if (!(left_comb.first == right_comb.first))
+			throw exception_t(TABLE_COMB_ERROR, "Table combination error, no BA, AA");
 
-		//std::vector<AddrPair> exp_b;
-		//exp_b.reserve(b.size());
+		switch (merge_type)
+		{
+		case AND:
+		{
+			int li = 0, ri = 0;
+			while (li < left.size() && ri < right.size())
+			{
+				if (left[li].first == right[ri].first)
+				{
+					c.emplace_back(left[li].first, left[li].second);
+					li++;
+				}
+				else if (left[li].first < right[ri].first)
+				{
+					li++;
+				}
+				else
+				{
+					ri++;
+				}
+			}
+		}
+		break;
+		case OR:
+		{
+			// Right is unique
+			int li = 0, ri = 0;
+			while (li < left.size() && ri < right.size())
+			{
+				if (left[li].first == right[ri].first)
+				{
+					li++;
+				}
+				else if (left[li].first < right[ri].first)
+				{
+					c.emplace_back(right[ri].first, right[ri].second);
+					li++;
+				}
+				else
+				{
+					for (int i = 0; i < left_comb.second->size(); i++)
+						c.emplace_back(right[ri].first, i);
+					ri++;
+				}
+			}
 
-		//auto a_begin = a_comb.first->begin();
-		//auto a_end = a_comb.first->end();
+			while (ri < right.size())
+			{
+				for (int i = 0; i < left_comb.second->size(); i++)
+					c.emplace_back(right[ri].first, i);
+				ri++;
+			}
 
-		//for (auto bit = b.begin(); bit != b.end(); bit++)
-		//	for (auto ait = a_comb.first->begin(); ait != a_end; ait++)
-		//		exp_b.emplace_back(bit->first, ait - a_begin);
+			while (li < left.size())
+			{
+				c.emplace_back(left[li].first, left[li].second);
+				li++;
+			}
+		}
+		break;
+		default:
+			break;
+		}
 
-		//merge(a, merge_type, exp_b, c);
-		return std::pair<LightTable *, LightTable *>(a_comb.first , b_comb.first );
+		return std::pair<LightTable *, LightTable *>(left_comb.first , left_comb.second);
 	}
 }

@@ -6,6 +6,11 @@
 #include "SQLParser.h"
 #include "DatabaseLiteFile.h"
 
+enum DatabaseAggregateType
+{
+	NO_AGGRE, COUNT, SUM
+};
+
 /*
 	DatabaseLite
 
@@ -16,7 +21,7 @@ class DatabaseLite
 {
 public:
 	typedef std::pair<sql::TableRef *, LightTable*> FromEntry;
-	typedef std::pair<int, int> SelectEntry;
+	typedef std::tuple<LightTable *, int, int, DatabaseAggregateType, bool> SelectEntry;
 
 	DatabaseLite(const char *dbs_filepath);
 	~DatabaseLite();
@@ -32,10 +37,15 @@ private:
 	void exec_insert(sql::SQLStatement *stmt);
 	void exec_select(sql::SQLStatement *stmt);
 
-	void parse_select_clause(
-		std::vector<sql::Expr *> * select_clause,
+	void exec_select_aggre(std::pair<int, int> pair, SelectEntry aggre_ent, int & aggre_counter);
+
+	void parse_select_entry(
+		sql::Expr *col_ref,
 		std::vector<FromEntry> & from_tables,
-		std::vector<SelectEntry> & select_cols);
+		std::pair<LightTable *, LightTable *> & ble_comb,
+		DatabaseAggregateType aggre_type,
+		std::vector<std::tuple<LightTable *, int, int, DatabaseAggregateType, bool>> & select_cols
+	);
 
 	void parse_from_clause(
 		std::vector<sql::TableRef*> *from_clause,

@@ -82,7 +82,7 @@ struct attr_t
 		int integer;
 		char varchar[ATTR_SIZE_MAX];
 		attr_value_t(int _val) : integer(_val) {}
-		attr_value_t(const char *_str) 
+		attr_value_t(const char *_str) : varchar{ 0 }
 		{
 #ifdef _STRDUP_VER_
 			varchar = _strdup(_str); 
@@ -91,7 +91,7 @@ struct attr_t
 #endif
 		}
 
-		attr_value_t() {}
+		attr_value_t() : varchar{0} {}
 		~attr_value_t() {}
 
 		attr_value_t& operator=(int _val)

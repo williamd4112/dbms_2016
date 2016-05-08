@@ -59,7 +59,8 @@ public:
 		merge_type_t merge_type,
 		std::pair<LightTable *, LightTable *> b_comb,
 		std::vector<AddrPair>& b,
-		std::vector<AddrPair>& c);
+		std::vector<AddrPair>& c,
+		std::vector<LightTable*> & from_tables);
 
 	static inline void map(
 		std::vector<uint32_t> & addrs,
@@ -95,6 +96,7 @@ public:
 	bool has_attr(std::string attr_name);
 	uint32_t size();
 	uint32_t tuple_size();
+	uint8_t get_attr_type(int i);
 	std::string name() { return mTablename; }
 
 	void dump();
