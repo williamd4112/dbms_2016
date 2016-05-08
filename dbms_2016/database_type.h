@@ -133,6 +133,11 @@ public:
 			0;
 	}
 
+	inline void init_as(attr_domain_t _domain)
+	{
+		domain = _domain;
+	}
+
 	inline attr_domain_t Domain() const { return domain; }
 	inline int Int() const { return value.integer; }
 	inline const char *Varchar() const { return value.varchar; }
@@ -164,7 +169,7 @@ public:
 		case INTEGER_DOMAIN:
 			return os << attr.value.integer;
 		case VARCHAR_DOMAIN:
-			return os << attr.value.varchar;
+			return os << ((attr.value.varchar[0] != '\0') ? attr.value.varchar : "NULL");
 		default:
 			return os << "null";
 		}

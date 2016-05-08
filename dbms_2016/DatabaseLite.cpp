@@ -112,7 +112,10 @@ void DatabaseLite::exec_insert(sql::SQLStatement * stmt)
 	LightTable & table_ref = mDbf.get_table(in_st->tableName);
 	
 	const auto & values = *(in_st->values);
-	AttrTuple tuple(values.size());
+	AttrTuple tuple(table_ref.tuple_size());
+	for (int i = 0; i < tuple.size(); i++)
+		tuple[i].init_as((table_ref.get_attr_type(i) == ATTR_TYPE_INTEGER) ? INTEGER_DOMAIN : VARCHAR_DOMAIN);
+
 
 	if (in_st->columns != NULL)
 	{

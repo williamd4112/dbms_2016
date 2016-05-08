@@ -195,7 +195,7 @@ void test_database_lite_create()
 	char buff[255];
 	for (int i = 0; i < 10; i++)
 	{
-		sprintf(buff, "INSERT INTO Book VALUES(%d, 'Book%d', %d);", i, i * 10, i);
+		sprintf(buff, "INSERT INTO Book VALUES(%d);", i);
 		ss << buff << "\n";
 	}
 	gDb.exec(ss.str());
@@ -225,7 +225,7 @@ void test_database_select()
 	//gDb.exec(std::string("SELECT Book.* FROM Book AS B WHERE BookID > 5 AND BookID < 8;"));
 	//std::cout << "\n";
 	// S C 2 Join AND
-	gDb.exec(std::string("SELECT COUNT(Book.*) FROM Book AS B, Student AS S WHERE B.BookID = S.StudentID;"));
+	gDb.exec(std::string("SELECT Count(BookName) FROM Book;"));
 	//std::cout << "\n";
 	// C S 2 Join AND
 	//gDb.exec(std::string("SELECT Book.*, StudentID FROM Book AS B, Student AS S WHERE BookID = StudentID OR BookID < 5;"));
