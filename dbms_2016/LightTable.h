@@ -72,6 +72,10 @@ public:
 		LightTable *b, 
 		std::vector<AddrPair> & match_pairs);
 
+	static std::vector<AddrPair> product(
+		std::vector<AddrPair> & reflexive_pairs, 
+		LightTable * b);
+
 	void create(const char *tablename, AttrDesc *descs, int num);
 	void create_index(const char *attr_name, IndexType type);
 
@@ -90,6 +94,7 @@ public:
 	int get_attr_id(std::string attr_name);
 	bool has_attr(std::string attr_name);
 	uint32_t size();
+	uint32_t tuple_size();
 	std::string name() { return mTablename; }
 
 	void dump();

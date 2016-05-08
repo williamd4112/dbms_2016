@@ -193,7 +193,7 @@ void test_database_lite_create()
 
 	std::stringstream ss;
 	char buff[255];
-	for (int i = 0; i < 10; i++)
+	for (int i = 0; i < 100000; i++)
 	{
 		sprintf(buff, "INSERT INTO Book VALUES(%d, 'Book%d', %d);", i, i * 10, i);
 		ss << buff << "\n";
@@ -202,7 +202,7 @@ void test_database_lite_create()
 
 	std::stringstream ss2;
 	char buff2[255];
-	for (int i = 0; i < 10; i++)
+		for (int i = 0; i < 10000; i++)
 	{
 		sprintf(buff2, "INSERT INTO Student VALUES(%d, 'Student%d', 'Addr%d', %d, 'Dept%d');", i, i * 10, i, i, i);
 		gDb.exec(std::string(buff2));
@@ -216,6 +216,11 @@ void test_database_lite_insert()
 	gDb.exec(std::string("INSERT INTO Book VALUES(1, 'Book1', 20);"));
 }
 
+void test_database_select()
+{
+	gDb.exec(std::string("SELECT Book.*, StudentID FROM Book AS B, Student AS S WHERE BookID < 5 AND BookID = StudentID;"));
+}
+
 /*
 	TODO: Be more careful about address space
 	TODO: ';' in insert string will cause problem
@@ -223,7 +228,7 @@ void test_database_lite_insert()
 int main(int argc, char *argv[])
 {
 	test_database_lite_create();
-	gDb.exec(std::string("SELECT S.StudentScore, Book.BookPrice FROM Book AS B, Student AS S WHERE S.StudentScore > 5 OR S.StudentScore < 8;"));
+	profile(test_database_select);
 
 	system("pause");
 	return 0;

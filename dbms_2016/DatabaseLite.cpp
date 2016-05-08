@@ -159,7 +159,6 @@ void DatabaseLite::exec_select(sql::SQLStatement * stmt)
 	std::vector<std::tuple<LightTable *, int, int>> select_cols;
 
 	std::vector<sql::Expr*> * select_clause = select_stmt.selectList;
-	select_cols.resize(select_clause->size());
 
 	parse_from_clause(select_stmt.fromTable, from_tables);
 
@@ -181,19 +180,40 @@ void DatabaseLite::exec_select(sql::SQLStatement * stmt)
 	{
 		sql::Expr * col_ref = select_clause->at(i);
 
-		// First, second
-		LightTable * bind_table = match_table(col_ref, from_tables);
-		if (bind_table == NULL)
+		if (col_ref->type == sql::kExprStar)
 		{
-			throw exception_t(UNEXPECTED_ERROR, "Table not found.");
+			for (int i = 0; i < 2 && i < from_tables.size(); i++)
+			{
+				if (col_ref->hasTable())
+				{
+					if (strcmp(col_ref->table, from_tables[i].first->name) != 0)
+						continue;
+					if (col_ref->hasAlias() && from_tables[i].first->alias != NULL
+						&& strcmp(col_ref->alias, from_tables[i].first->alias) != 0)
+						continue;
+				}
+				int comb_id = i;
+				for(int j = 0; j < from_tables[i].second->tuple_size(); j++)
+					select_cols.emplace_back(std::make_tuple(from_tables[i].second, comb_id, j));
+			}
 		}
-		int comb_id = (bind_table == table_comb.first) ? 0 : 1;
+		else
+		{
+			// First, second
+			LightTable * bind_table = match_table(col_ref, from_tables);
+			if (bind_table == NULL)
+			{
+				throw exception_t(UNEXPECTED_ERROR, "Table not found.");
+			}
+			int comb_id = (bind_table == table_comb.first) ? 0 : 1;
 
-		// Tuple element id
-		int tuple_ele_id = bind_table->get_attr_id(col_ref->name);
-		select_cols[i] = std::make_tuple(bind_table, comb_id, tuple_ele_id);
+			// Tuple element id
+			int tuple_ele_id = bind_table->get_attr_id(col_ref->name);
+			select_cols.emplace_back(std::make_tuple(bind_table, comb_id, tuple_ele_id));
+		}
 	}
 	
+	// Select stage
 	if (select_stmt.hasWhere())
 	{
 		for (auto pair : where_addr_pairs.back())
@@ -234,7 +254,7 @@ void DatabaseLite::exec_select(sql::SQLStatement * stmt)
 		}
 		else if(from_tables.size() == 1)
 		{
-			LightTable *tables[2] = { from_tables[0].second , from_tables[1].second };
+			LightTable *tables[1] = { from_tables[0].second};
 			for (int ai = 0; ai < tables[0]->size(); ai++)
 			{
 				for (auto col : select_cols)
@@ -294,7 +314,17 @@ void DatabaseLite::parse_where_clause(
 		switch (expr->type)
 		{
 		case sql::kExprOperator: // TODO: handle UMINUS
-			opStack.push(expr);
+			if (expr->type == sql::Expr::UMINUS)
+			{
+				if(expr->expr == NULL) 
+					throw exception_t(UNEXPECTED_ERROR, "Where statement parsing error: unexpected literal.");
+				if(expr->expr->type != sql::kExprLiteralInt)
+					throw exception_t(UNEXPECTED_ERROR, "Where statement parsing error: unexpected literal.");
+				expr->expr->ival = -expr->expr->ival;
+				tokenStack.push(expr->expr);
+			}
+			else
+				opStack.push(expr);
 			break;
 		case sql::kExprColumnRef: case sql::kExprLiteralInt: case sql::kExprLiteralString:
 			tokenStack.push(expr);
@@ -362,6 +392,8 @@ void DatabaseLite::parse_where_clause(
 							operands[1]->name,
 							where_addr_pairs.back())
 					);
+
+					// if has two table, expand it
 					table_comb.first = table_comb.second = tables[0];
 				}
 				else
@@ -400,6 +432,8 @@ void DatabaseLite::parse_where_clause(
 					expr_op_to_rel(expr),
 					expr_to_attr(operands[1]),
 					where_addr_pairs.back()));
+
+				// if has two table, expand it
 				table_comb.first = table_comb.second = table;
 			}
 			else
