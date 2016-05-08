@@ -241,6 +241,7 @@ static DatabaseLite gDb("LiteDB.dbs");
 void parse_stream(istream &ifs, bool is_prompt);
 void parse_file(const char *filename);
 
+std::streambuf *console_out;
 /*
 	TODO: Be more careful about address space
 	TODO: ';' in insert string will cause problem
@@ -248,6 +249,7 @@ void parse_file(const char *filename);
 int main(int argc, char *argv[])
 {
 	quiet = false;
+	console_out = std::cout.rdbuf(); //save old buf
 
 	int i = 1;
 	if (i < argc)
@@ -274,9 +276,19 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	if (i < argc)
+	{
+		if (strcmp("-r", argv[i]) == 0)
+		{
+			i++;
+			report = true;
+		}
+	}
+
 	for (; i < argc; i++)
 	{
-		cout << PROMPT_PREFIX << "load " << argv[i] << endl;
+		if(interactive)
+			cout << PROMPT_PREFIX << "load " << argv[i] << endl;
 		parse_file(argv[i]);
 	}
 	
@@ -313,7 +325,7 @@ void parse_stream(istream &ifs, bool is_prompt)
 			{
 				scan_offset = semicol_pos + 1;
 
-				gDb.exec(input_buff.str(), true);
+				gDb.exec(input_buff.str(), report);
 
 				input_buff.str("");
 				input_buff.clear();
@@ -331,5 +343,5 @@ void parse_file(const char *filename)
 	std::ifstream ifs(filename);
 	std::string content((std::istreambuf_iterator<char>(ifs)),
 		(std::istreambuf_iterator<char>()));
-	gDb.exec(content);
+	gDb.exec(content, report);
 }

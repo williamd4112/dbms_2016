@@ -1,0 +1,41 @@
+1. 
+SELECT *
+FROM trans
+WHERE attr5 > 0;
+
+case 1:
+attr5 : no index
+
+time: 0.003s
+
+2.
+SELECT COUNT(*)
+FROM user1, trans
+WHERE user1.attr1 = trans.attr2 AND user1.attr5 > 50000;
+
+case 1:
+user1.attr1: no
+trans.attr2: no
+user1.attr5: no
+time: 0.529s
+
+3.
+SELECT COUNT(*)
+FROM user1
+WHERE attr3 > 100000 AND attr3 < 200000;
+
+case 1:
+user1.attr3: no
+
+4. 
+SELECT COUNT(*)
+FROM trans;
+
+time: 0.0000
+
+5.
+SELECT SUM(attr4)
+FROM user1
+WHERE attr3 = 1510503 OR attr5 > 500000;
+
+time: 0.0000

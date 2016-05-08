@@ -1,5 +1,5 @@
 CREATE TABLE user1(
-	userId int primary key,
+	userId int,
 	name varchar(30),
 	userLocation varchar(30)
 );

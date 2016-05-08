@@ -601,30 +601,6 @@ void TreeIndexFile::merge_large(const TreeIndexFile & a, const TreeIndexFile & b
 			match_pairs.emplace_back(ait->second, bit->second);
 	}
 #else
-	//auto ait = a.mTreeIndexTable.begin();
-	//auto bit = b.mTreeIndexTable.begin();
-	//auto a_end = a.mTreeIndexTable.end();
-	//auto b_end = b.mTreeIndexTable.end();
-
-	//while (ait != a_end && bit != b_end)
-	//{
-	//	if (bit->first == ait->first)
-	//	{
-	//		ait++;
-	//	}
-	//	else if (bit->first < ait->first)
-	//	{
-	//		auto temp_ait = ait;
-	//		while (temp_ait != a_end && bit->first < temp_ait->first)
-	//		{
-	//			match_pairs.emplace_back(temp_ait->second, bit->second);
-	//			temp_ait++;
-	//		}
-	//		bit++;
-	//	}
-	//	else
-	//		ait++;
-	//}
 
 	auto ait = a.mTreeIndexTable.begin();
 	auto bit = b.mTreeIndexTable.begin();

@@ -313,7 +313,17 @@ void LightTable::create_index(const char *attr_name, IndexType type)
 {
 	const AttrDesc &desc = mTablefile.get_attr_desc(attr_name);
 	std::string idx_path = mTablename + "_" + std::string(attr_name) + ".idx";
-	mTablefile.create_index(desc, type, idx_path.c_str());
+	
+	IndexFile & idx_file = mTablefile.create_index(desc, type, idx_path.c_str());
+	if (mDatafile.size() > 0)
+	{
+		int attr_id = get_attr_id(desc.name);
+		for(int i = 0; i < mDatafile.size(); i++)
+		{
+			AttrTuple & tuple = mDatafile.get(i);
+			idx_file.set(tuple[attr_id], i);
+		}
+	}
 }
 
 void LightTable::insert(AttrTuple & tuple)
@@ -1016,7 +1026,10 @@ std::pair<LightTable *, LightTable *> LightTable::merge(
 		// AB AA => AB
 		if (!(left_comb.first == right_comb.first))
 			throw exception_t(TABLE_COMB_ERROR, "Table combination error, no BA, AA");
-
+		if (left.begin() != left.end())
+			std::sort(left.begin(), left.end());
+		if (right.begin() != right.end())
+			std::sort(right.begin(), right.end());
 		switch (merge_type)
 		{
 		case AND:

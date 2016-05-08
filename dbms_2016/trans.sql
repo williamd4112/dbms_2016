@@ -1,5 +1,5 @@
 create table trans (
-	attr1 varchar(40) PRIMARY KEY,
+	attr1 varchar(40),
 	attr2 int,
 	attr3 int,
 	attr4 int, 

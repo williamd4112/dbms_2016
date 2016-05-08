@@ -1,5 +1,5 @@
 create table user1 (
-	attr1 int PRIMARY KEY,
+	attr1 int,
 	attr2 varchar(20),
 	attr3 int,
 	attr4 int, 

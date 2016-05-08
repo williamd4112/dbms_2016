@@ -11,6 +11,9 @@
 extern bool quiet;
 extern bool pause_at_exit;
 extern bool interactive;
+extern bool report;
+
+extern std::streambuf *console_out;
 
 typedef void(*Routine)();
 

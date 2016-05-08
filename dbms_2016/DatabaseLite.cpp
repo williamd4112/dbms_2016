@@ -98,25 +98,45 @@ void DatabaseLite::exec_create(sql::SQLStatement * stmt)
 {
 	sql::CreateStatement *create_stmt = static_cast<sql::CreateStatement*>(stmt);
 
-	std::vector<AttrDesc> attr_descs(create_stmt->columns->size());
-	if (create_stmt->columns == NULL)
-		throw exception_t(UNEXPECTED_ERROR, "Unexpected error: Create statement has null column def");
-
-	const auto col_defs = create_stmt->columns;
-	uint32_t offset = 0;
-	for (int i = 0; i < attr_descs.size(); i++)
+	if (create_stmt->createType == sql::CreateStatement::CreateType::TABLE)
 	{
-		const sql::ColumnDefinition *col_def = col_defs->at(i);
-		strncpy(attr_descs[i].name, col_def->name, ATTR_NAME_MAX);
-		attr_descs[i].offset = offset;
-		attr_descs[i].size = col_def->length;
-		attr_descs[i].type = db::type_coldef_to_attr(col_def->type);
-		attr_descs[i].constraint = (col_def->IsPK) ? ATTR_CONSTRAINT_PRIMARY_KEY : ATTR_CONSTRAINT_NO;
+		std::vector<AttrDesc> attr_descs(create_stmt->columns->size());
+		if (create_stmt->columns == NULL)
+			throw exception_t(UNEXPECTED_ERROR, "Unexpected error: Create statement has null column def");
 
-		offset += attr_descs[i].size;
+		const auto col_defs = create_stmt->columns;
+		uint32_t offset = 0;
+		for (int i = 0; i < attr_descs.size(); i++)
+		{
+			const sql::ColumnDefinition *col_def = col_defs->at(i);
+			strncpy(attr_descs[i].name, col_def->name, ATTR_NAME_MAX);
+			attr_descs[i].offset = offset;
+			attr_descs[i].size = col_def->length;
+			attr_descs[i].type = db::type_coldef_to_attr(col_def->type);
+			attr_descs[i].constraint = (col_def->IsPK) ? ATTR_CONSTRAINT_PRIMARY_KEY : ATTR_CONSTRAINT_NO;
+
+			offset += attr_descs[i].size;
+		}
+
+		mDbf.set_table(create_stmt->tableName, attr_descs);
 	}
-
-	mDbf.set_table(create_stmt->tableName, attr_descs);
+	else if(create_stmt->createType == sql::CreateStatement::INDEX)
+	{
+		LightTable & table = mDbf.get_table(create_stmt->tableName);
+		switch (create_stmt->indexType)
+		{
+			case sql::CreateStatement::IndexType::HASH:
+				table.create_index(create_stmt->attrName, HASH);
+				std::cout << "Create hash index at " << create_stmt->attrName << " on " << create_stmt->tableName << "\n";
+				break;
+			case sql::CreateStatement::IndexType::TREE:
+				table.create_index(create_stmt->attrName, TREE);
+				std::cout << "Create tree index at " << create_stmt->attrName << " on " << create_stmt->tableName << "\n";
+				break;
+			default:
+				throw exception_t(UNEXPECTED_ERROR, "Unknown index type");
+		}
+	}
 }
 
 void DatabaseLite::exec_insert(sql::SQLStatement * stmt)

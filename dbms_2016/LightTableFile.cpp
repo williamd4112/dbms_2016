@@ -44,7 +44,7 @@ inline void LightTableFile::create(const char *tablename, AttrDesc * descs, int 
 	build_attr_desc_index();
 }
 
-inline void LightTableFile::create_index(const AttrDesc & desc, IndexType type, const char * idx_path)
+inline IndexFile & LightTableFile::create_index(const AttrDesc & desc, IndexType type, const char * idx_path)
 {
 	IndexFile *idxFile = gen_indexfile(desc, type);
 	auto res = mIndexFileMap.insert({ desc.name, idxFile });
@@ -57,6 +57,7 @@ inline void LightTableFile::create_index(const AttrDesc & desc, IndexType type, 
 		delete idxFile;
 		throw exception_t(DUPLICATE_INDEX_FILE, "Duplicated index file");
 	}
+	return *idxFile;
 }
 
 const AttrDesc &LightTableFile::get_attr_desc(const char * attr_name)
@@ -112,6 +113,9 @@ inline void LightTableFile::write_back()
 	{
 		table_index_record_t idx_record(it->first, it->second->get_filepath(), it->second->type());
 		fwrite(&idx_record, sizeof(table_index_record_t), 1, mFile);
+
+		it->second->write_back();
+		delete it->second;
 	}
 }
 

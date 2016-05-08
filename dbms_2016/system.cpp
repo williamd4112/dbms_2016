@@ -13,6 +13,7 @@ bool quiet = false;
 
 bool pause_at_exit = true;
 bool interactive = false;
+bool report = false;
 
 void fatal_error()
 {

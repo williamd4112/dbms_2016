@@ -36,7 +36,7 @@ public:
 	~LightTableFile();
 	
 	inline void create(const char *tablename, AttrDesc *descs, int num);
-	inline void create_index(const AttrDesc &desc, IndexType type, const char *idx_path);
+	inline IndexFile & create_index(const AttrDesc &desc, IndexType type, const char *idx_path);
 
 	const AttrDesc &get_attr_desc(const char *attr_name);
 	const AttrDescPool &get_attr_descs();
