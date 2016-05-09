@@ -108,7 +108,7 @@ inline void SequenceFile<E>::write_back()
 
 		for (int i = 0; i < tuple_size; i++)
 		{
-			ss << tuple[i] << "\t";
+			ss << tuple[i] << ",";
 		}
 
 		fprintf(mFile, "%s\n", ss.str().c_str());
@@ -127,8 +127,14 @@ inline bool SequenceFile<E>::read_tuple()
 {
 	assert(!mTypes.empty());
 
-	static int ival_buff;
-	static char sval_buff[SEQFILE_STRING_MAX_LEN];
+	int ival_buff = 0;
+	std::string sval_buff;
+	static char line_buff[8192];
+
+	if (fgets(line_buff, 8192, mFile) == NULL)
+		return false;
+
+	std::istringstream line(line_buff);
 
 	Tuple tuple;
 	tuple.resize(mTypes.size());
@@ -138,14 +144,15 @@ inline bool SequenceFile<E>::read_tuple()
 		switch (mTypes[i])
 		{
 		case SEQ_INT:
-			if(fscanf(mFile, "%d", &ival_buff) != 1)
+			if (!(line >> ival_buff))
 				return false;
 			tuple[i] = ival_buff;
+			line.ignore();
 			break;
 		case SEQ_VARCHAR:
-			if(fscanf(mFile, "%s", sval_buff) != 1)
+			if (!std::getline(line, sval_buff, ','))
 				return false;
-			tuple[i] = sval_buff;
+			tuple[i] = sval_buff.c_str();
 			break;
 		default:
 			throw exception_t(SEQFILE_UNEXPECTED_TYPE, "Unexpected type");
