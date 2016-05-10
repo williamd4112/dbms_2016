@@ -10,7 +10,7 @@
 #include <cassert>
 
 #define ATTR_NUM_MAX 5
-#define ATTR_NAME_MAX 41
+#define ATTR_NAME_MAX 45
 #define TABLE_NAME_MAX ATTR_NAME_MAX
 #define ATTR_SIZE_MAX ATTR_NAME_MAX
 

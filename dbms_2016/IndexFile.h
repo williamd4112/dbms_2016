@@ -50,6 +50,9 @@ public:
 	virtual uint32_t get_not(const attr_t &attr_ref, const uint32_t fix_addr, std::vector<AddrPair> &match_pairs) = 0;
 
 	const IndexType type() const { return mType; }
+	void write_back_pair(const void *src, uint32_t addr);
+	void write_back_pair(int ival, uint32_t addr);
+	bool read_from_pair(void *dst, uint32_t * addr_dst);
 protected:
 	IndexType mType;
 	attr_domain_t mKeydomain;

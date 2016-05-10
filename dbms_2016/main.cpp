@@ -297,8 +297,8 @@ int main(int argc, char *argv[])
 
 	if(pause_at_exit)
 		system("pause");
-	gDb.save();
 
+	gDb.save();
 	return 0;
 }
 

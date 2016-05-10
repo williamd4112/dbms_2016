@@ -114,9 +114,9 @@ void HashIndexFile::write_back()
 	for (HashIndexTable::iterator it = mHashIndexTable.begin(); it != mHashIndexTable.end(); it++)
 	{
 		if (mKeydomain == INTEGER_DOMAIN)
-			fprintf(mFile, "%d\t%u\n", it->first.Int(), it->second);
+			write_back_pair(it->first.Int(), it->second);
 		else if (mKeydomain == VARCHAR_DOMAIN)
-			fprintf(mFile, "%s\t%u\n", it->first.Varchar(), it->second);
+			write_back_pair(it->first.Varchar(), it->second);
 	}
 }
 
@@ -129,7 +129,7 @@ void HashIndexFile::read_from()
 	if (mKeydomain == INTEGER_DOMAIN)
 	{
 		int ival;
-		while (fscanf(mFile, "%d%u", &ival, &addr) == 2)
+		while (read_from_pair(&ival, &addr))
 		{
 			mHashIndexTable.insert(pair<attr_t, uint32_t>(attr_t(ival), addr));
 		}
@@ -137,9 +137,12 @@ void HashIndexFile::read_from()
 	else if (mKeydomain == VARCHAR_DOMAIN)
 	{
 		char sval[ATTR_SIZE_MAX + 1];
-		while (fscanf(mFile, "%s%u", sval, &addr) == 2)
+		memset(sval, 0, ATTR_SIZE_MAX + 1);
+
+		while (read_from_pair(sval, &addr))
 		{
 			mHashIndexTable.insert(pair<attr_t, uint32_t>(attr_t(sval), addr));
+			memset(sval, 0, ATTR_SIZE_MAX + 1);
 		}
 	}
 }
@@ -258,9 +261,9 @@ void PrimaryIndexFile::write_back()
 	for (HashIndexTable::iterator it = mPrimaryIndexTable.begin(); it != mPrimaryIndexTable.end(); it++)
 	{
 		if (mKeydomain == INTEGER_DOMAIN)
-			fprintf(mFile, "%d\t%u\n", it->first.Int(), it->second);
+			write_back_pair(it->first.Int(), it->second);
 		else if (mKeydomain == VARCHAR_DOMAIN)
-			fprintf(mFile, "%s\t%u\n", it->first.Varchar(), it->second);
+			write_back_pair(it->first.Varchar(), it->second);
 	}
 }
 
@@ -273,7 +276,7 @@ void PrimaryIndexFile::read_from()
 	if (mKeydomain == INTEGER_DOMAIN)
 	{
 		int ival;
-		while (fscanf(mFile, "%d%u", &ival, &addr) == 2)
+		while (read_from_pair(&ival, &addr))
 		{
 			mPrimaryIndexTable.insert(pair<attr_t, uint32_t>(attr_t(ival), addr));
 		}
@@ -281,9 +284,11 @@ void PrimaryIndexFile::read_from()
 	else if (mKeydomain == VARCHAR_DOMAIN)
 	{
 		char sval[ATTR_SIZE_MAX + 1];
-		while (fscanf(mFile, "%s%u", sval, &addr) == 2)
+		memset(sval, 0, ATTR_SIZE_MAX + 1);
+		while (read_from_pair(sval, &addr))
 		{
 			mPrimaryIndexTable.insert(pair<attr_t, uint32_t>(attr_t(sval), addr));
+			memset(sval, 0, ATTR_SIZE_MAX + 1);
 		}
 	}
 }
@@ -475,9 +480,9 @@ void TreeIndexFile::write_back()
 	for (TreeIndexTable::iterator it = mTreeIndexTable.begin(); it != mTreeIndexTable.end(); it++)
 	{
 		if (mKeydomain == INTEGER_DOMAIN)
-			fprintf(mFile, "%d\t%u\n", it->first.Int(), it->second);
+			write_back_pair(it->first.Int(), it->second);
 		else if (mKeydomain == VARCHAR_DOMAIN)
-			fprintf(mFile, "%s\t%u\n", it->first.Varchar(), it->second);
+			write_back_pair(it->first.Varchar(), it->second);
 	}
 }
 
@@ -490,7 +495,7 @@ void TreeIndexFile::read_from()
 	if (mKeydomain == INTEGER_DOMAIN)
 	{
 		int ival;
-		while (fscanf(mFile, "%d%u", &ival, &addr) == 2)
+		while (read_from_pair(&ival, &addr))
 		{
 			mTreeIndexTable.insert(pair<attr_t, uint32_t>(attr_t(ival), addr));
 		}
@@ -498,9 +503,11 @@ void TreeIndexFile::read_from()
 	else if (mKeydomain == VARCHAR_DOMAIN)
 	{
 		char sval[ATTR_SIZE_MAX + 1];
-		while (fscanf(mFile, "%s%u", sval, &addr) == 2)
+		memset(sval, 0, ATTR_SIZE_MAX + 1);
+		while (read_from_pair(sval, &addr))
 		{
 			mTreeIndexTable.insert(pair<attr_t, uint32_t>(attr_t(sval), addr));
+			memset(sval, 0, ATTR_SIZE_MAX + 1);
 		}
 	}
 }
@@ -627,4 +634,24 @@ void TreeIndexFile::merge_large(const TreeIndexFile & a, const TreeIndexFile & b
 			bit++;
 	}
 #endif
+}
+
+void IndexFile::write_back_pair(const void *src, uint32_t addr)
+{
+	fwrite(src, mKeysize, 1, mFile);
+	fwrite(&addr, sizeof(uint32_t), 1, mFile);
+}
+
+void IndexFile::write_back_pair(int ival, uint32_t addr)
+{
+	write_back_pair(&ival, addr);
+}
+
+bool IndexFile::read_from_pair(void *dst, uint32_t * addr_dst)
+{
+	if (fread(dst, mKeysize, 1, mFile) == 0)
+		return false;
+	if (fread(addr_dst, sizeof(uint32_t), 1, mFile) == 0)
+		return false;
+	return true;
 }

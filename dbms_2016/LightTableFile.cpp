@@ -50,7 +50,7 @@ inline IndexFile & LightTableFile::create_index(const AttrDesc & desc, IndexType
 	auto res = mIndexFileMap.insert({ desc.name, idxFile });
 	if (res.second)
 	{
-		idxFile->open(idx_path, "w+");
+		idxFile->open(idx_path, "wb+");
 	}
 	else
 	{
@@ -144,7 +144,7 @@ inline void LightTableFile::read_from()
 			throw exception_t(DUPLICATE_INDEX_FILE, "Duplicated index file found when read from disk.");
 		}
 		
-		idx_file->open(index_record.index_name, "r+");
+		idx_file->open(index_record.index_name, "rb+");
 		idx_file->read_from();
 	}
 }
@@ -203,13 +203,13 @@ inline IndexFile * LightTableFile::gen_indexfile(const AttrDesc & desc, IndexTyp
 	switch (index_type)
 	{
 	case PHASH:
-		return  new PrimaryIndexFile(domain, mTableHeader.rowsize);
+		return  new PrimaryIndexFile(domain, desc.size);
 		break;
 	case HASH:
-		return new HashIndexFile(domain, mTableHeader.rowsize);
+		return new HashIndexFile(domain, desc.size);
 		break;
 	case TREE:
-		return new TreeIndexFile(domain, mTableHeader.rowsize);
+		return new TreeIndexFile(domain, desc.size);
 		break;
 	default:
 		throw exception_t(UNSUPPORTED_INDEX_TYPE, "Unsupported index type");
