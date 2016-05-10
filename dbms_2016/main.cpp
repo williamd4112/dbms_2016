@@ -38,7 +38,7 @@ using namespace sql;
 static void parse_stream(istream &ifs, bool is_prompt);
 static void parse_file(const char *);
 
-static DatabaseLite gDb("LiteDB.dbs");
+static DatabaseLite gDb("LiteDB.dbs"); 
 
 //LightTable tbl;
 //LightTable t1, t2;
