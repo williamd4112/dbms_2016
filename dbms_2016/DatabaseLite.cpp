@@ -564,7 +564,7 @@ void DatabaseLite::parse_where_clause(
 			if (operands[0]->type == sql::kExprColumnRef && operands[1]->type == sql::kExprColumnRef)
 			{
 				LightTable *tables[2] = { 0 };
-				for (int i = 0; i < from_tables.size(); i++)
+				for (int i = 0; i < 2; i++)
 					tables[i] = match_table(operands[i], from_tables);
 
 				if (tables[0] == tables[1])
