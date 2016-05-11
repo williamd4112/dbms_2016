@@ -153,6 +153,7 @@ void DatabaseLite::exec_insert(sql::SQLStatement * stmt)
 	for (int i = 0; i < tuple.size(); i++)
 		tuple[i].init_as((table_ref.get_attr_type(i) == ATTR_TYPE_INTEGER) ? INTEGER_DOMAIN : VARCHAR_DOMAIN);
 
+	const AttrDescPool & attr_descs = table_ref.get_attr_descs();
 
 	if (in_st->columns != NULL)
 	{
@@ -165,20 +166,31 @@ void DatabaseLite::exec_insert(sql::SQLStatement * stmt)
 			if (values[col_id]->type == sql::kExprLiteralInt)
 				tuple[col_id] = values[i]->ival;
 			else if (values[i]->type == sql::kExprLiteralString)
+			{
+				//if(strlen(values[i]->name) > attr_descs[col_id].size)
+				//	throw exception_t(UNEXPECTED_ERROR, "String too long.");
 				tuple[col_id] = values[i]->name;
+			}
 			else
 				throw exception_t(UNEXPECTED_ERROR, "Unknown expr value type");
 		}
 	}
 	else
 	{
+		if(values.size() > attr_descs.size())
+			throw exception_t(UNEXPECTED_ERROR, "Too many values.");
+
 		// Order mapping
 		for (int i = 0; i < values.size(); i++)
 		{
 			if (values[i]->type == sql::kExprLiteralInt)
 				tuple[i] = values[i]->ival;
 			else if (values[i]->type == sql::kExprLiteralString)
+			{
+				//if (strlen(values[i]->name) > attr_descs[i].size)
+				//	throw exception_t(UNEXPECTED_ERROR, "String too long.");
 				tuple[i] = values[i]->name;
+			}
 			else
 				throw exception_t(UNEXPECTED_ERROR, "Unknown expr value type");
 		}

@@ -298,6 +298,20 @@ int main(int argc, char *argv[])
 	if(pause_at_exit)
 		system("pause");
 
+	//gDb.exec(std::string("CREATE TABLE Book (BookID int, BookName varchar(40) PRIMARY KEY, BookPrice int, BookISBN varchar(40));"));
+	//gDb.exec_create_index("Book", "BookPrice", TREE);
+	//gDb.exec_create_index("Book", "BookID", HASH);
+	//gDb.exec_create_index("Book", "BookISBN", HASH);
+	//
+	//std::stringstream ss;
+	//char buff[255];	
+	//for (int i = 0; i < 10; i++)
+	//{
+	//	sprintf(buff, "INSERT INTO Book VALUES(%d, 'AppleAppleAppleAppleAppleAppleAppleAppl%d', %d, 'ISBN%d');",i ,i ,i * 10, i * -100);
+	//	gDb.exec(std::string(buff));
+	//}
+	//gDb.exec(std::string("SELECT * FROM Book;"));
+
 	gDb.save();
 	return 0;
 }

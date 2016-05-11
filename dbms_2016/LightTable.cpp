@@ -282,8 +282,14 @@ void LightTable::create(const char * tablename, AttrDesc * descs, int num)
 
 	init_seq_types(descs, num);
 
-	mDatafile.open(dat_path.c_str(), "w+");
-	mDatafile.init(mSeqTypes.data(), num);
+	std::vector<uint32_t> sizes(mTablefile.mTableHeader.attrNum);
+	for (int i = 0; i < sizes.size(); i++)
+	{
+		sizes[i] = mTablefile.mAttrDescPool[i].size;
+	}
+
+	mDatafile.open(dat_path.c_str(), "wb+");
+	mDatafile.init(mSeqTypes.data(), sizes, num);
 }
 
 void LightTable::load(const char * tablename)
@@ -294,12 +300,18 @@ void LightTable::load(const char * tablename)
 	std::string dat_path = mTablename + ".dat";
 	
 	mTablefile.open(tbl_path.c_str(), "rb+");
-	mDatafile.open(dat_path.c_str(), "r+");
+	mDatafile.open(dat_path.c_str(), "rb+");
 
 	mTablefile.read_from();
 	init_seq_types(mTablefile.mAttrDescPool.data(), mTablefile.mAttrDescPool.size());
 
-	mDatafile.init(mSeqTypes.data(), mSeqTypes.size());
+	std::vector<uint32_t> sizes(mTablefile.mTableHeader.attrNum);
+	for (int i = 0; i < sizes.size(); i++)
+	{
+		sizes[i] = mTablefile.mAttrDescPool[i].size;
+	}
+
+	mDatafile.init(mSeqTypes.data(), sizes, mSeqTypes.size());
 	mDatafile.read_from();
 }
 
@@ -385,6 +397,11 @@ int LightTable::get_attr_id(std::string attr_name)
 	if (key_id < 0)
 		throw exception_t(UNKNOWN_ATTR, attr_name.c_str());
 	return key_id;
+}
+
+const AttrDescPool & LightTable::get_attr_descs()
+{
+	return mTablefile.get_attr_descs();
 }
 
 bool LightTable::has_attr(std::string attr_name)
@@ -1020,6 +1037,12 @@ std::pair<LightTable *, LightTable *> LightTable::merge(
 		
 
 		return std::pair<LightTable *, LightTable *>( left_comb.first , right_comb.second );
+	}
+	else if (b_reflex)
+	{
+		// AB BB
+
+		// BB AB
 	}
 	else
 	{

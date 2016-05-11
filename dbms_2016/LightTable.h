@@ -93,6 +93,7 @@ public:
 	
 	AttrTuple &get_tuple(uint32_t index);
 	int get_attr_id(std::string attr_name);
+	const AttrDescPool & get_attr_descs();
 	bool has_attr(std::string attr_name);
 	uint32_t size();
 	uint32_t tuple_size();

@@ -29,15 +29,16 @@ class SequenceFile
 	typedef std::vector<E> Tuple;
 	typedef std::vector<Tuple> TupleVector;
 	typedef std::vector<SequenceElementType> TypeVector;
+	typedef std::vector<uint32_t> SizeVector;
 	typedef typename std::vector<std::vector<E>>::iterator TupleIterator;
 public:
-	SequenceFile(const SequenceElementType *types, int num);
+	SequenceFile(const SequenceElementType *types, SizeVector & sizes, int num);
 	SequenceFile();
 	~SequenceFile();
 
 	inline std::vector<E> &get(uint32_t index);
 	inline uint32_t put(Tuple &tuple);
-	inline void init(const SequenceElementType *types, int num);
+	inline void init(const SequenceElementType *types, SizeVector & sizes, int num);
 
 	TupleIterator begin() { return mTuples.begin(); }
 	TupleIterator end() { return mTuples.end(); }
@@ -49,13 +50,14 @@ public:
 private:
 	TupleVector mTuples;
 	TypeVector mTypes;
+	SizeVector mSizes;
 
 	inline bool read_tuple();
 };
 
 template<class E>
-inline SequenceFile<E>::SequenceFile(const SequenceElementType *types, int num)
-	: mTypes(types , types + num)
+inline SequenceFile<E>::SequenceFile(const SequenceElementType *types, SizeVector & sizes, int num)
+	: mTypes(types , types + num), mSizes(sizes.begin(), sizes.end())
 {
 
 }
@@ -87,11 +89,14 @@ inline uint32_t SequenceFile<E>::put(Tuple & tuple)
 }
 
 template<typename E>
-inline void SequenceFile<E>::init(const SequenceElementType * types, int num)
+inline void SequenceFile<E>::init(const SequenceElementType * types, SizeVector & sizes, int num)
 {
 	mTuples.clear();
 	mTypes.clear();
 	mTypes.assign(types, types + num);
+
+	mSizes.clear();
+	mSizes.assign(sizes.begin(), sizes.end());
 }
 
 template<class E>
@@ -101,17 +106,31 @@ inline void SequenceFile<E>::write_back()
 
 	fseek(mFile, 0, SEEK_SET);
 	const int tuple_size = mTypes.size();
+	
+	int ival;
+	char sval[ATTR_SIZE_MAX + 2];
+
 	for (TupleVector::iterator it = mTuples.begin(); it != mTuples.end(); it++)
 	{
 		std::stringstream ss;
-		const Tuple tuple = *it;
+		const Tuple & tuple = *it;
 
 		for (int i = 0; i < tuple_size; i++)
 		{
-			ss << tuple[i] << ",";
+			if (mTypes[i] == SEQ_INT)
+			{
+				ival = tuple[i].Int();
+				fwrite(&ival, mSizes[i], 1, mFile);
+			}
+			else if(mTypes[i] == SEQ_VARCHAR)
+			{
+				memset(sval, 0, ATTR_SIZE_MAX + 2);
+				strncpy(sval, tuple[i].Varchar(), ATTR_SIZE_MAX);
+				fwrite(sval, mSizes[i], 1, mFile);
+			}
 		}
 
-		fprintf(mFile, "%s\n", ss.str().c_str());
+		//fprintf(mFile, "%s\n", ss.str().c_str());
 	}
 }
 
@@ -127,14 +146,8 @@ inline bool SequenceFile<E>::read_tuple()
 {
 	assert(!mTypes.empty());
 
-	int ival_buff = 0;
-	std::string sval_buff;
-	static char line_buff[8192];
-
-	if (fgets(line_buff, 8192, mFile) == NULL)
-		return false;
-
-	std::istringstream line(line_buff);
+	int ival = 0;
+	char sval[ATTR_SIZE_MAX + 2];
 
 	Tuple tuple;
 	tuple.resize(mTypes.size());
@@ -144,15 +157,15 @@ inline bool SequenceFile<E>::read_tuple()
 		switch (mTypes[i])
 		{
 		case SEQ_INT:
-			if (!(line >> ival_buff))
+			if (fread(&ival, mSizes[i], 1, mFile) == 0)
 				return false;
-			tuple[i] = ival_buff;
-			line.ignore();
+			tuple[i] = ival;
 			break;
 		case SEQ_VARCHAR:
-			if (!std::getline(line, sval_buff, ','))
+			memset(sval, 0, ATTR_SIZE_MAX + 2);
+			if (fread(sval, mSizes[i], 1, mFile) == 0)
 				return false;
-			tuple[i] = sval_buff.c_str();
+			tuple[i] = sval;
 			break;
 		default:
 			throw exception_t(SEQFILE_UNEXPECTED_TYPE, "Unexpected type");
