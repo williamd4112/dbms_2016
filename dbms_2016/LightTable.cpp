@@ -1038,12 +1038,6 @@ std::pair<LightTable *, LightTable *> LightTable::merge(
 
 		return std::pair<LightTable *, LightTable *>( left_comb.first , right_comb.second );
 	}
-	else if (b_reflex)
-	{
-		// AB BB
-
-		// BB AB
-	}
 	else
 	{
 		// AB AA => AB
